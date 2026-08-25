@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { InventoryRecord, Material, Session } from '../types';
+import type { ESign, InventoryRecord, Material, Session } from '../types';
 import { resetDbConnection, getDb } from '../lib/db';
 import { buildDefaultMatrixDocument, setMatrixCacheForTests } from '../lib/permissions';
 import { receiveGoods, qaDisposition, samplePull, listInventory, getInventory, listMovements } from '../lib/inventory';
-import { submitRequest, pickSerialForRequest, confirmFulfillment } from '../lib/requests';
+import { submitRequest, pickSerialForRequest, confirmFulfillment, approveRequestSupervisor } from '../lib/requests';
 import { proposeFefo } from '../lib/fefo';
 import { locationCode, parseLocationCode } from '../lib/locations';
 import { listAudit } from '../lib/audit';
@@ -20,6 +20,26 @@ function sess(role: string, userId = role): Session {
     mustChangePassword: false,
   };
 }
+
+function reqEsign(session: Session, meaning = 'I request this material transfer.'): ESign {
+  return {
+    userId: session.userId,
+    printedName: session.fullName,
+    signedAtUtc: '2026-08-24T12:00:00.000Z',
+    meaningOfSignature: meaning,
+  };
+}
+
+const transferBase = {
+  materialCode: 'API-001' as const,
+  qtyRequested: 1,
+  uom: 'vial' as const,
+  neededBy: '2026-09-01',
+  toLocation: 'LVM' as const,
+  classification: ['GMP'] as ('GMP' | 'High Quality')[],
+  intendedUse: 'batch A',
+  priority: 'Routine' as const,
+};
 
 async function resetTestDb(): Promise<void> {
   await resetDbConnection();
@@ -144,15 +164,10 @@ describe('material request pick/issue', () => {
 
   it('cannot pick quarantine for request', async () => {
     const [q] = await receiveGoods(sess('operator', 'wh'), receiveInput({ numberOfContainers: 1 }));
-    const req = await submitRequest(sess('requester', 'lab'), {
-      materialCode: 'API-001',
-      qtyRequested: 1,
-      uom: 'vial',
-      neededBy: '2026-09-01',
-      destination: 'Lab',
-      purpose: 'batch A',
-      priority: 'Routine',
-    });
+    const lab = sess('requester', 'lab');
+    const req = await submitRequest(lab, { ...transferBase, requestorEsign: reqEsign(lab) });
+    const sup = sess('supervisor', 'admin');
+    await approveRequestSupervisor(sup, req.requestId, reqEsign(sup, 'I approve this material transfer.'));
     await expect(pickSerialForRequest(sess('operator', 'wh'), req.requestId, q.serial, 1)).rejects.toThrow(/Quarantine/);
   });
 
@@ -175,18 +190,22 @@ describe('material request pick/issue', () => {
   it('request issue writes audit+movement with requestId', async () => {
     const recs = await receiveGoods(sess('operator', 'wh'), receiveInput({ numberOfContainers: 1 }));
     await qaDisposition(sess('qa'), recs[0].serial, 'Release', esign, 'ok', 'batch');
-    const req = await submitRequest(sess('requester', 'lab'), {
-      materialCode: 'API-001',
-      qtyRequested: 1,
-      uom: 'vial',
-      neededBy: '2026-09-01',
-      destination: 'Suite 2',
-      purpose: 'PPQ-1',
+    const lab = sess('requester', 'lab');
+    const req = await submitRequest(lab, {
+      ...transferBase,
+      toLocation: 'SVM',
+      intendedUse: 'PPQ-1',
       priority: 'Urgent',
+      requestorEsign: reqEsign(lab),
     });
-    expect(req.reservedSerials.length).toBeGreaterThan(0);
+    const sup = sess('supervisor', 'admin');
+    const approved = await approveRequestSupervisor(sup, req.requestId, reqEsign(sup, 'I approve this material transfer.'));
+    expect(approved.reservedSerials.length).toBeGreaterThan(0);
     await pickSerialForRequest(sess('operator', 'wh'), req.requestId, recs[0].serial, 1);
-    const done = await confirmFulfillment(sess('operator', 'wh'), req.requestId, '');
+    const wh = sess('operator', 'wh');
+    const done = await confirmFulfillment(wh, req.requestId, '', reqEsign(wh, 'I confirm the quantity issued for this material transfer.'), {
+      commentsNa: true,
+    });
     expect(done.status).toBe('Issued');
     const mov = await listMovements();
     expect(mov.some((m) => m.requestId === req.requestId && m.action === 'ISSUE')).toBe(true);
@@ -203,24 +222,12 @@ describe('material request pick/issue', () => {
   it('FEFO auto-reserve: two requests cannot claim the same serial', async () => {
     const recs = await receiveGoods(sess('operator', 'wh'), receiveInput({ numberOfContainers: 2 }));
     await qaDisposition(sess('qa'), recs[0].serial, 'Release', esign, 'ok', 'batch');
-    const a = await submitRequest(sess('requester', 'lab'), {
-      materialCode: 'API-001',
-      qtyRequested: 1,
-      uom: 'vial',
-      neededBy: '2026-09-01',
-      destination: 'Lab',
-      purpose: 'A',
-      priority: 'Routine',
-    });
-    const b = await submitRequest(sess('requester', 'lab'), {
-      materialCode: 'API-001',
-      qtyRequested: 1,
-      uom: 'vial',
-      neededBy: '2026-09-01',
-      destination: 'Lab',
-      purpose: 'B',
-      priority: 'Routine',
-    });
+    const lab = sess('requester', 'lab');
+    const a0 = await submitRequest(lab, { ...transferBase, intendedUse: 'A', requestorEsign: reqEsign(lab) });
+    const b0 = await submitRequest(lab, { ...transferBase, intendedUse: 'B', requestorEsign: reqEsign(lab) });
+    const sup = sess('supervisor', 'admin');
+    const a = await approveRequestSupervisor(sup, a0.requestId, reqEsign(sup, 'I approve this material transfer.'));
+    const b = await approveRequestSupervisor(sup, b0.requestId, reqEsign(sup, 'I approve this material transfer.'));
     expect(a.reservedSerials[0].serial).not.toBe(b.reservedSerials[0].serial);
     const taken = a.reservedSerials[0].serial;
     await expect(pickSerialForRequest(sess('operator', 'wh'), b.requestId, taken, 1)).rejects.toThrow(/reserved/);

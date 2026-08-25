@@ -524,3 +524,28 @@ html[data-theme="dark"] .attach-receipt { background: var(--surface-2); border-c
   border-radius: 999px;
   margin-left: 4px;
 }
+
+.st-Pending-Supervisor { background: var(--warn-soft); color: var(--warn); }
+.st-Pending-QA { background: var(--hold-soft); color: var(--hold); }
+.st-Approved, .st-Submitted { background: var(--accent-soft); color: var(--accent-ink); }
+.st-Picking, .st-Partially-Issued { background: var(--q-soft); color: var(--q); }
+.st-Closed { background: var(--ok-soft); color: var(--ok); }
+.st-Cancelled { background: var(--surface-2); color: var(--muted); }
+.check-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.check-row label { display: flex; flex-direction: row; align-items: center; gap: 6px; font-weight: 600; }
+.mtf-section { border: 1px solid var(--line); padding: 12px; border-radius: var(--radius-sm); margin: 8px 0; }
+.mtf-section legend { font-weight: 700; font-size: 12px; }
+.mtf-print {
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  margin: 8px 0;
+}
+.mtf-print h1 { font-size: 16px; margin: 0 0 8px; }
+.mtf-print h2 { font-size: 13px; margin: 12px 0 4px; border-bottom: 1px solid var(--line); }
+.mtf-print p { margin: 2px 0; font-size: 12.5px; }
+@media print {
+  .mtf-print { display: block; color: #000; background: #fff; box-shadow: none; border-color: #000; }
+  .mtf-print h2 { border-bottom-color: #000; }
+}

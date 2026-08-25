@@ -1,7 +1,18 @@
-import type { MaterialRequest, PickedLine, RequestPriority, Session, Uom } from '../types';
+import type {
+  ESign,
+  MaterialClassification,
+  MaterialRequest,
+  PickedLine,
+  RequestPriority,
+  RequestStatus,
+  Session,
+  ToLocation,
+  Uom,
+} from '../types';
+import { PRESENTATION_ROLE_ID, TO_LOCATIONS } from '../types';
 import { getDb } from './db';
 import { appendAudit, listAudit } from './audit';
-import { nowUtcIso, todayIsoDateInTz } from './dates';
+import { locationToString, nowUtcIso, todayIsoDateInTz } from './dates';
 import { availableReleasedQty, isIssueBlocked, proposeFefo, proposeFefoAllocations, shouldWarnFefo } from './fefo';
 import {
   clearReservationsForRequest,
@@ -16,6 +27,10 @@ import { formatRequestId } from './serial';
 import { getMaterial } from './materials';
 import type { SerialCounter } from '../types';
 
+const WAREHOUSE_PICK_STATUSES: RequestStatus[] = ['Approved', 'Picking', 'Partially Issued'];
+const CANCELABLE_STATUSES: RequestStatus[] = ['Submitted', 'Pending Supervisor', 'Pending QA'];
+const CLASSIFICATION_OK: MaterialClassification[] = ['GMP', 'High Quality'];
+
 async function nextRequestId(): Promise<string> {
   const db = await getDb();
   const year = new Date().getUTCFullYear();
@@ -26,21 +41,63 @@ async function nextRequestId(): Promise<string> {
   return id;
 }
 
+/** Old Submitted rows without a supervisor e-sign are treated as Pending Supervisor. */
+export function normalizeRequest(req: MaterialRequest): MaterialRequest {
+  if (req.status === 'Submitted' && !req.supervisorEsign) {
+    return { ...req, status: 'Pending Supervisor' };
+  }
+  return req;
+}
+
+export function requiresQa(req: Pick<MaterialRequest, 'cellBankOrQuarantine'>): boolean {
+  return req.cellBankOrQuarantine === true;
+}
+
+function allowedStatusesFor(req: MaterialRequest): string[] {
+  if (req.cellBankOrQuarantine && req.qaEsign) return ['Quarantine', 'Released'];
+  return ['Released'];
+}
+
+function assertEsign(session: Session, esign: ESign | undefined, label: string): asserts esign is ESign {
+  if (!esign?.userId || !esign.printedName || !esign.meaningOfSignature || !esign.signedAtUtc) {
+    throw new Error(`${label} electronic signature is incomplete`);
+  }
+  if (esign.userId !== session.userId) throw new Error('Signature user must match session');
+}
+
+function assertNotSelfApprove(session: Session, requestedBy: string, action: string): void {
+  if (session.role === PRESENTATION_ROLE_ID) return;
+  if (session.userId === requestedBy) {
+    throw new Error(`Segregation of duties: requestor cannot ${action} their own transfer`);
+  }
+}
+
 export async function listRequests(): Promise<MaterialRequest[]> {
   const db = await getDb();
-  const all = (await db.getAll('materialRequests')) as MaterialRequest[];
+  const all = ((await db.getAll('materialRequests')) as MaterialRequest[]).map(normalizeRequest);
   all.sort((a, b) => b.requestedOnUtc.localeCompare(a.requestedOnUtc));
   return all;
 }
 
 export async function getRequest(requestId: string): Promise<MaterialRequest | undefined> {
   const db = await getDb();
-  return (await db.get('materialRequests', requestId)) as MaterialRequest | undefined;
+  const rec = (await db.get('materialRequests', requestId)) as MaterialRequest | undefined;
+  return rec ? normalizeRequest(rec) : undefined;
 }
 
 export async function listOpenRequests(): Promise<MaterialRequest[]> {
   const all = await listRequests();
-  return all.filter((r) => ['Submitted', 'Picking', 'Partially Issued'].includes(r.status));
+  return all.filter((r) => WAREHOUSE_PICK_STATUSES.includes(r.status));
+}
+
+export async function listPendingSupervisor(): Promise<MaterialRequest[]> {
+  const all = await listRequests();
+  return all.filter((r) => r.status === 'Pending Supervisor');
+}
+
+export async function listPendingQa(): Promise<MaterialRequest[]> {
+  const all = await listRequests();
+  return all.filter((r) => r.status === 'Pending QA');
 }
 
 export type SubmitRequestInput = {
@@ -48,26 +105,76 @@ export type SubmitRequestInput = {
   qtyRequested: number;
   uom: Uom;
   neededBy: string;
-  destination: string;
-  purpose: string;
+  destination?: string;
+  purpose?: string;
   priority: RequestPriority;
   comments?: string;
+  toLocation: ToLocation;
+  destinationOther?: string;
+  classification: MaterialClassification[];
+  intendedUse: string;
+  cellBankOrQuarantine?: boolean;
+  requestorEsign: ESign;
 };
+
+function displayDestination(toLocation: ToLocation, destinationOther?: string): string {
+  if (toLocation === 'Other') return (destinationOther || '').trim();
+  return toLocation;
+}
+
+async function applyFefoReserve(session: Session, rec: MaterialRequest): Promise<void> {
+  const asOf = todayIsoDateInTz();
+  const inv = await listInventory();
+  const statuses = allowedStatusesFor(rec);
+  const allocations = proposeFefoAllocations(
+    inv,
+    rec.materialCode,
+    rec.qtyRequested,
+    asOf,
+    rec.requestId,
+    statuses,
+  );
+  rec.reservedSerials = allocations;
+  if (allocations.length) {
+    await reserveSerialsForRequest(session, rec.requestId, allocations);
+  }
+  const reservedQty = allocations.reduce((s, a) => s + a.qty, 0);
+  if (reservedQty + 1e-9 < rec.qtyRequested) {
+    rec.stockWarning = `Insufficient ${statuses.join('/')} FEFO stock: requested ${rec.qtyRequested} ${rec.uom}, reserved ${reservedQty} ${rec.uom}. Transfer still approved.`;
+    await notifyUser(
+      rec.requestedBy,
+      `Insufficient stock for ${rec.requestId}`,
+      rec.stockWarning,
+      'insufficient_stock',
+      rec.requestId,
+    );
+  }
+}
 
 export async function submitRequest(session: Session, input: SubmitRequestInput): Promise<MaterialRequest> {
   await assertCapability(session, 'submitRequest', 'Role cannot submit material requests');
   if (!input.materialCode) throw new Error('Material is required');
   if (!(input.qtyRequested > 0)) throw new Error('Requested quantity must be > 0');
-  if (!input.destination.trim()) throw new Error('Destination is required');
-  if (!input.purpose.trim()) throw new Error('Purpose / batch is required');
+  if (!input.toLocation || !(TO_LOCATIONS as readonly string[]).includes(input.toLocation)) {
+    throw new Error('To location is required');
+  }
+  if (input.toLocation === 'Other' && !input.destinationOther?.trim()) {
+    throw new Error('Specify Other destination');
+  }
+  const classification = (input.classification || []).filter((c) => CLASSIFICATION_OK.includes(c));
+  if (classification.length < 1) throw new Error('Classification is required (GMP and/or High Quality)');
+  const intendedUse = (input.intendedUse || input.purpose || '').trim();
+  if (!intendedUse) throw new Error('Intended use is required');
+  assertEsign(session, input.requestorEsign, 'Requestor');
   const mat = await getMaterial(input.materialCode);
   if (!mat || !mat.active) throw new Error('Material is not on the approved Material Master');
   const asOf = todayIsoDateInTz();
   const inv = await listInventory();
   const avail = availableReleasedQty(inv, input.materialCode, asOf);
+  const destination = displayDestination(input.toLocation, input.destinationOther);
   const stockWarning =
     avail < input.qtyRequested
-      ? `Insufficient Released FEFO stock: requested ${input.qtyRequested} ${input.uom}, available ${avail} ${input.uom}. Request still accepted.`
+      ? `Insufficient Released FEFO stock: requested ${input.qtyRequested} ${input.uom}, available ${avail} ${input.uom}. Transfer still accepted pending approval.`
       : '';
   const requestId = await nextRequestId();
   const utc = nowUtcIso();
@@ -77,38 +184,41 @@ export async function submitRequest(session: Session, input: SubmitRequestInput)
     materialName: mat.materialName,
     qtyRequested: input.qtyRequested,
     qtyIssued: 0,
+    qtyReceived: 0,
     uom: input.uom || mat.defaultUom,
     neededBy: input.neededBy,
-    destination: input.destination.trim(),
-    purpose: input.purpose.trim(),
+    destination,
+    purpose: intendedUse,
+    intendedUse,
+    toLocation: input.toLocation,
+    destinationOther: input.toLocation === 'Other' ? input.destinationOther?.trim() : undefined,
+    classification,
+    cellBankOrQuarantine: Boolean(input.cellBankOrQuarantine),
     priority: input.priority || 'Routine',
-    status: 'Submitted',
+    status: 'Pending Supervisor',
     requestedBy: session.userId,
     requestedOnUtc: utc,
     pickedSerials: [],
     reservedSerials: [],
     comments: input.comments ?? '',
     stockWarning: stockWarning || undefined,
+    requestorEsign: input.requestorEsign,
   };
-  const allocations = proposeFefoAllocations(inv, rec.materialCode, rec.qtyRequested, asOf);
-  rec.reservedSerials = allocations;
   const db = await getDb();
   await db.add('materialRequests', rec);
-  if (allocations.length) {
-    await reserveSerialsForRequest(session, requestId, allocations);
-  }
   await appendAudit(session, {
     action: 'REQUEST_SUBMIT',
     recordId: requestId,
     field: 'status',
     oldValue: '',
-    newValue: 'Submitted',
+    newValue: 'Pending Supervisor',
     reasonForChange: `${mat.materialCode} qty ${input.qtyRequested} ${rec.uom} → ${rec.destination}`,
+    meaningOfSignature: input.requestorEsign.meaningOfSignature,
   });
   await notifyCapability(
-    'fulfillRequest',
-    `Request ${requestId} submitted`,
-    `${session.fullName} requested ${input.qtyRequested} ${rec.uom} of ${mat.materialCode} ${mat.materialName} for ${rec.purpose}.`,
+    'approveRequest',
+    `Material transfer ${requestId} pending supervisor`,
+    `${session.fullName} requested ${input.qtyRequested} ${rec.uom} of ${mat.materialCode} ${mat.materialName} for ${rec.intendedUse}.`,
     'request_submitted',
     requestId,
     session.userId,
@@ -121,16 +231,98 @@ export async function submitRequest(session: Session, input: SubmitRequestInput)
       'insufficient_stock',
       requestId,
     );
+  }
+  return rec;
+}
+
+export async function approveRequestSupervisor(
+  session: Session,
+  requestId: string,
+  esign: ESign,
+): Promise<MaterialRequest> {
+  await assertCapability(session, 'approveRequest', 'Role cannot approve material transfers');
+  assertEsign(session, esign, 'Supervisor');
+  const req = await getRequest(requestId);
+  if (!req) throw new Error('Request not found');
+  if (req.status !== 'Pending Supervisor') {
+    throw new Error(`Cannot supervisor-approve a ${req.status} transfer`);
+  }
+  assertNotSelfApprove(session, req.requestedBy, 'supervisor-approve');
+  const old = req.status;
+  req.supervisorEsign = esign;
+  if (requiresQa(req)) {
+    req.status = 'Pending QA';
+    await notifyCapability(
+      'qaDisposition',
+      `Material transfer ${requestId} pending QA`,
+      `${req.materialCode} ${req.qtyRequested} ${req.uom} — cell bank or quarantined material.`,
+      'request_submitted',
+      requestId,
+      session.userId,
+    );
+  } else {
+    req.status = 'Approved';
+    await applyFefoReserve(session, req);
     await notifyCapability(
       'fulfillRequest',
-      `Insufficient stock: ${requestId}`,
-      stockWarning,
-      'insufficient_stock',
+      `Material transfer ${requestId} approved`,
+      `${req.materialCode} ${req.qtyRequested} ${req.uom} → ${req.destination}. Ready to pick.`,
+      'request_issued',
       requestId,
       session.userId,
     );
   }
-  return rec;
+  const db = await getDb();
+  await db.put('materialRequests', req);
+  await appendAudit(session, {
+    action: 'REQUEST_SUPERVISOR_APPROVE',
+    recordId: requestId,
+    field: 'status',
+    oldValue: old,
+    newValue: req.status,
+    reasonForChange: `Supervisor approved ${requestId}`,
+    meaningOfSignature: esign.meaningOfSignature,
+  });
+  return req;
+}
+
+export async function approveRequestQa(
+  session: Session,
+  requestId: string,
+  esign: ESign,
+): Promise<MaterialRequest> {
+  await assertCapability(session, 'qaDisposition', 'QA disposition capability required');
+  assertEsign(session, esign, 'QA');
+  const req = await getRequest(requestId);
+  if (!req) throw new Error('Request not found');
+  if (req.status !== 'Pending QA') {
+    throw new Error(`Cannot QA-approve a ${req.status} transfer`);
+  }
+  assertNotSelfApprove(session, req.requestedBy, 'QA-approve');
+  const old = req.status;
+  req.qaEsign = esign;
+  req.status = 'Approved';
+  await applyFefoReserve(session, req);
+  await notifyCapability(
+    'fulfillRequest',
+    `Material transfer ${requestId} approved`,
+    `${req.materialCode} ${req.qtyRequested} ${req.uom} → ${req.destination}. Ready to pick.`,
+    'request_issued',
+    requestId,
+    session.userId,
+  );
+  const db = await getDb();
+  await db.put('materialRequests', req);
+  await appendAudit(session, {
+    action: 'REQUEST_QA_APPROVE',
+    recordId: requestId,
+    field: 'status',
+    oldValue: old,
+    newValue: 'Approved',
+    reasonForChange: `QA approved ${requestId}`,
+    meaningOfSignature: esign.meaningOfSignature,
+  });
+  return req;
 }
 
 export function proposeFefoForRequest(
@@ -146,7 +338,14 @@ export function proposeFefoForRequest(
   }[],
   asOf: string,
 ) {
-  return proposeFefo(inventory, req.materialCode, req.qtyRequested - req.qtyIssued, asOf, req.requestId);
+  return proposeFefo(
+    inventory,
+    req.materialCode,
+    req.qtyRequested - req.qtyIssued,
+    asOf,
+    req.requestId,
+    allowedStatusesFor(req),
+  );
 }
 
 export async function pickSerialForRequest(
@@ -159,7 +358,7 @@ export async function pickSerialForRequest(
   if (!(qty > 0)) throw new Error('Pick quantity must be > 0');
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
-  if (!['Submitted', 'Picking', 'Partially Issued'].includes(req.status)) {
+  if (!WAREHOUSE_PICK_STATUSES.includes(req.status)) {
     throw new Error(`Cannot pick for a ${req.status} request`);
   }
   const rec = await getInventory(serial);
@@ -171,13 +370,13 @@ export async function pickSerialForRequest(
     throw new Error(`Serial ${serial} is reserved for request ${rec.reservedForRequestId}`);
   }
   const asOf = todayIsoDateInTz();
-  const block = isIssueBlocked(rec, asOf, requestId);
+  const allowQuarantine = Boolean(req.cellBankOrQuarantine && req.qaEsign);
+  const block = isIssueBlocked(rec, asOf, requestId, { allowQuarantine });
   if (block.blocked) throw new Error(block.reason);
   const already = req.pickedSerials.find((p) => p.serial === serial)?.qty ?? 0;
   if (qty + already > rec.currentQty) throw new Error('Pick quantity exceeds remaining container quantity');
   const remainingNeed = req.qtyRequested - req.qtyIssued - req.pickedSerials.reduce((s, p) => s + p.qty, 0);
   if (qty > remainingNeed && remainingNeed > 0) {
-    // allow over-pick of a unit vial (qtyPerContainer=1) but not more than remaining need for bulk
     if ((rec.qtyPerContainer || rec.qtyReceived) > 1) {
       throw new Error(`Pick quantity ${qty} exceeds remaining request need ${remainingNeed}`);
     }
@@ -214,12 +413,12 @@ export async function removePick(
   await assertCapability(session, 'fulfillRequest', 'Role cannot fulfill material requests');
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
-  if (!['Submitted', 'Picking'].includes(req.status)) {
+  if (!['Approved', 'Picking'].includes(req.status)) {
     throw new Error('Cannot unpick after issue confirmation');
   }
   const oldQty = req.pickedSerials.find((p) => p.serial === serial)?.qty ?? 0;
   req.pickedSerials = req.pickedSerials.filter((p) => p.serial !== serial);
-  if (!req.pickedSerials.length) req.status = 'Submitted';
+  if (!req.pickedSerials.length) req.status = 'Approved';
   const db = await getDb();
   await db.put('materialRequests', req);
   await appendAudit(session, {
@@ -233,17 +432,39 @@ export async function removePick(
   return req;
 }
 
+function uniqueJoin(values: string[]): string {
+  return [...new Set(values.filter(Boolean))].join(', ');
+}
+
 export async function confirmFulfillment(
   session: Session,
   requestId: string,
   fefoOverrideReason: string,
+  mmEsign: ESign,
+  mm?: { comments?: string; commentsNa?: boolean },
 ): Promise<MaterialRequest> {
   await assertCapability(session, 'fulfillRequest', 'Role cannot fulfill material requests');
+  assertEsign(session, mmEsign, 'Materials Management');
+  const hasComments = Boolean(mm?.comments?.trim());
+  const na = Boolean(mm?.commentsNa);
+  if (hasComments === na) {
+    throw new Error('Materials Management comments or N/A is required (not both)');
+  }
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
   if (!req.pickedSerials.length) throw new Error('No serials picked');
   const asOf = todayIsoDateInTz();
   const all = await listInventory();
+  const allowQuarantine = Boolean(req.cellBankOrQuarantine && req.qaEsign);
+  const pickedRecs = req.pickedSerials
+    .map((line) => all.find((r) => r.serial === line.serial))
+    .filter((r): r is NonNullable<typeof r> => Boolean(r));
+  req.sourceLot = uniqueJoin(pickedRecs.map((r) => r.internalLot || r.manufacturerLot));
+  req.sourceExpiry = uniqueJoin(pickedRecs.map((r) => r.expiryDate));
+  req.sourceLocation = uniqueJoin(pickedRecs.map((r) => locationToString(r.location)));
+  req.mmComments = hasComments ? mm!.comments!.trim() : '';
+  req.mmCommentsNa = na;
+  req.mmEsign = mmEsign;
   for (const line of req.pickedSerials) {
     const rec = all.find((r) => r.serial === line.serial);
     if (!rec) throw new Error(`Serial ${line.serial} not found`);
@@ -263,6 +484,7 @@ export async function confirmFulfillment(
       `Issued against request ${req.requestId} (${req.purpose})`,
       fefoOverrideReason,
       req.requestId,
+      { allowQuarantine },
     );
     req.qtyIssued = Math.round((req.qtyIssued + line.qty) * 10000) / 10000;
   }
@@ -283,6 +505,7 @@ export async function confirmFulfillment(
     oldValue: 'Picking',
     newValue: req.status,
     reasonForChange: `Confirmed pick for ${requestId}; qtyIssued=${req.qtyIssued}`,
+    meaningOfSignature: mmEsign.meaningOfSignature,
   });
   await notifyUser(
     req.requestedBy,
@@ -294,8 +517,17 @@ export async function confirmFulfillment(
   return req;
 }
 
-export async function confirmReceived(session: Session, requestId: string): Promise<MaterialRequest> {
+export async function confirmReceived(
+  session: Session,
+  requestId: string,
+  esign: ESign,
+  qtyReceived: number,
+): Promise<MaterialRequest> {
   await assertCapability(session, 'confirmRequestReceipt', 'Role cannot confirm request receipt');
+  assertEsign(session, esign, 'Receiver');
+  if (!(qtyReceived >= 0) || Number.isNaN(qtyReceived)) {
+    throw new Error('Quantity received is required and must be ≥ 0');
+  }
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
   if (req.status !== 'Issued' && req.status !== 'Partially Issued') {
@@ -306,6 +538,8 @@ export async function confirmReceived(session: Session, requestId: string): Prom
   }
   const old = req.status;
   req.status = 'Closed';
+  req.qtyReceived = qtyReceived;
+  req.receiverEsign = esign;
   req.receivedBy = session.userId;
   req.receivedOnUtc = nowUtcIso();
   const db = await getDb();
@@ -316,7 +550,8 @@ export async function confirmReceived(session: Session, requestId: string): Prom
     field: 'status',
     oldValue: old,
     newValue: 'Closed',
-    reasonForChange: 'Requester confirmed received (chain of custody)',
+    reasonForChange: `Requester confirmed received qty ${qtyReceived} ${req.uom} (chain of custody)`,
+    meaningOfSignature: esign.meaningOfSignature,
   });
   return req;
 }
@@ -326,10 +561,11 @@ export async function cancelRequest(session: Session, requestId: string, reason:
   if (!reason.trim()) throw new Error('Cancel reason is required');
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
-  if (req.status !== 'Submitted') throw new Error('Only Submitted requests may be cancelled');
+  if (!CANCELABLE_STATUSES.includes(req.status)) throw new Error('Only pending-approval transfers may be cancelled');
   if (req.requestedBy !== session.userId && session.role !== 'supervisor') {
     throw new Error('Only the requester (or a supervisor) may cancel');
   }
+  const old = req.status;
   req.status = 'Cancelled';
   req.rejectReason = reason.trim();
   await clearReservationsForRequest(session, requestId);
@@ -340,7 +576,7 @@ export async function cancelRequest(session: Session, requestId: string, reason:
     action: 'REQUEST_CANCEL',
     recordId: requestId,
     field: 'status',
-    oldValue: 'Submitted',
+    oldValue: old,
     newValue: 'Cancelled',
     reasonForChange: reason,
   });
@@ -360,7 +596,15 @@ export async function rejectRequest(session: Session, requestId: string, reason:
   if (!reason.trim()) throw new Error('Reject reason is required');
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
-  if (!['Submitted', 'Picking', 'Partially Issued'].includes(req.status)) {
+  const rejectable: RequestStatus[] = [
+    'Submitted',
+    'Pending Supervisor',
+    'Pending QA',
+    'Approved',
+    'Picking',
+    'Partially Issued',
+  ];
+  if (!rejectable.includes(req.status)) {
     throw new Error(`Cannot reject a ${req.status} request`);
   }
   const old = req.status;

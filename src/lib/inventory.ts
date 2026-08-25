@@ -486,13 +486,14 @@ export async function issueDispense(
   reason: string,
   fefoOverrideReason: string,
   requestId?: string,
+  opts?: { allowQuarantine?: boolean },
 ): Promise<{ rec: InventoryRecord; fefoWarning: string }> {
   await assertCapability(session, 'issue', 'Role cannot issue stock');
   if (!(qty > 0)) throw new Error('Issue quantity must be > 0');
   const rec = await getInventory(serial);
   if (!rec) throw new Error('Record not found');
   const asOf = todayIsoDateInTz();
-  const block = isIssueBlocked(rec, asOf, requestId);
+  const block = isIssueBlocked(rec, asOf, requestId, opts);
   if (block.blocked) throw new Error(block.reason);
   if (qty > rec.currentQty) throw new Error('Issue quantity exceeds current quantity');
   const all = await listInventory();

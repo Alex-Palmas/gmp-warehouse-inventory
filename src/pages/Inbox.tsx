@@ -16,7 +16,9 @@ export function Inbox({ session }: { session: Session }) {
   if (!allowed) return <CapDenied cap="viewInbox" />;
 
   function href(m: InboxMessage): string {
-    if (m.kind.startsWith('request') || m.kind === 'insufficient_stock') return '/requests';
+    if (m.kind === 'request_submitted') return '/requests?view=approve';
+    if (m.kind === 'request_issued' || m.kind === 'request_ready' || m.kind === 'insufficient_stock' || m.kind.startsWith('request'))
+      return '/requests';
     if (m.kind.startsWith('material')) return '/submit-material';
     return '/';
   }

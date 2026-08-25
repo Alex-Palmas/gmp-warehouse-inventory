@@ -5,11 +5,11 @@ Standalone **system of record** for warehouse containers in a pharmaceutical / b
 
 This application is a technical control set that *can support* 21 CFR Part 11, 21 CFR 211 warehouse/records, EU GMP Annex 11, ALCOA+, and GAMP 5 **after** the site executes IQ/OQ/PQ, trains users, and adopts SOPs. It is **not** certified, validated, or fully compliant as shipped.
 
-Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.9`
+Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.4.0`
 
 ## Intended use
 
-Local (single-node, browser) inventory register for **per-container** serials (`WH-YYYY-NNNNNN`), receipt batches (`RCV-YYYY-NNNNNN`), goods receipt into Quarantine, QA e-signed lot-release of sibling containers, sampling, material submissions, material requests (`MR-YYYY-NNNNNN`) with FEFO auto-reserve → scan pick → issue, location barcodes, append-only audit trail, JSON backup/restore, and Excel reports (reports are not the system of record). Optional CoA/certificate files (PDF, JPEG, PNG, WebP, GIF; max 10 MB) may be stored in IndexedDB against a serial or the receipt batch. This is not a validated document management system; backup JSON includes base64 attachment bytes.
+Local (single-node, browser) inventory register for **per-container** serials (`WH-YYYY-NNNNNN`), receipt batches (`RCV-YYYY-NNNNNN`), goods receipt into Quarantine, QA e-signed lot-release of sibling containers, sampling, material submissions, material transfers (`MR-YYYY-NNNNNN`) with supervisor/QA e-sign, FEFO reserve on Approved → scan pick → issue, location barcodes, append-only audit trail, JSON backup/restore, and Excel reports (reports are not the system of record). Optional CoA/certificate files (PDF, JPEG, PNG, WebP, GIF; max 10 MB) may be stored in IndexedDB against a serial or the receipt batch. This is not a validated document management system; backup JSON includes base64 attachment bytes.
 
 See `docs/10-Intended-Use-Known-Limitations.md`, `docs/11-Access-Control-Matrix.md`, `docs/12-Material-Request-and-Serialization.md`, and `docs/13-Part11-Access-and-Audit.md`.
 
@@ -69,12 +69,12 @@ Idle session timeout is 15 minutes. Re-authentication is required for QA e-signa
 
 ## Typical flow (OQ-style) — v1.3
 
-1. Log in as `lab` (temp password `LabUser123!x`, 12-char policy). Change password. **Submit material** if the item is not on the master; QA/supervisor approves → Material Master. **Request material**: typeahead, qty, needed-by, Enter. FEFO Released stock is auto-reserved.
+1. Log in as `lab` (temp password `LabUser123!x`, 12-char policy). Change password. **Submit material** if the item is not on the master; QA/supervisor approves → Material Master. **Material Transfer**: typeahead, qty, to-location, classification, intended use, requestor e-sign. Status Pending Supervisor (QA if cell bank/quarantine). FEFO reserve happens when the transfer is **Approved** — not on submit.
 2. Log in as `wh`. Change temp password. **Receive**: N containers × qty per container (e.g. 24 vials × 10 mL) → N unique serials, one `receiptBatchId`, all Quarantine. Duplicate last receipt copies material/supplier/location. Print all N labels (Code 128 of serial; QR `serial|lot|expiry|status|containerType`).
 3. Scan (HID Enter-terminated). Success/error beep + flash. On Requests, scan adds to the open pick (wrong material/status/expired = error beep, not added).
 4. Log in as `qa`. QA Disp. default = release entire receipt batch (one e-sign, audit each serial). Optional single-container reject. Samples: pull sample/retain child serial from a parent.
-5. As `wh`, Requests queue: walk-path sorted by location, print pick ticket, pick reserved serials, confirm issue. Movement + audit include `requestId`. Direct Issue remains for emergency.
-6. As `lab`, inbox “ready” → confirm received → Closed.
+5. As `admin` (supervisor), **Pending my approval** → e-sign. Warehouse queue shows only Approved+ transfers. As `wh`, walk-path pick, MM comments or N/A, MM e-sign confirm issue. Movement + audit include `requestId`. Direct Issue remains for emergency.
+6. As `lab`, inbox “ready” → qty received + receiver e-sign → Closed.
 7. Transfer/putaway: scan container, then scan `LOC-…` location barcode. Print location labels from Transfer.
 8. Dashboard KPI cards (Quarantine, Released, Hold, Rejected, Restricted, Expired, Exp 30d, Exp 90d, open/reserved requests) are clickable — they open the register or request queue already filtered (`#/register?status=Released`, `#/register?filter=exp30`, `#/requests?view=open`). Clear the filter to see all.
 9. `sysadmin` Access matrix (e-sign on save). Audit is append-only (UTC + America/Los_Angeles).

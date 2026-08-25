@@ -7,7 +7,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { exportExcelWorkbook, downloadBlob } from '../lib/excelExport';
 import { exportBackup } from '../lib/backup';
 import { useCap, useCaps } from '../hooks/useCap';
-import { listOpenRequests, listRequests } from '../lib/requests';
+import { listOpenRequests, listPendingQa, listPendingSupervisor, listRequests } from '../lib/requests';
 import { listSubmissions } from '../lib/submissions';
 
 export function Dashboard({ session }: { session: Session }) {
@@ -17,11 +17,15 @@ export function Dashboard({ session }: { session: Session }) {
   const [rows, setRows] = useState<InventoryRecord[]>([]);
   const [openReqs, setOpenReqs] = useState<MaterialRequest[]>([]);
   const [myReqs, setMyReqs] = useState<MaterialRequest[]>([]);
+  const [pendingSup, setPendingSup] = useState<MaterialRequest[]>([]);
+  const [pendingQa, setPendingQa] = useState<MaterialRequest[]>([]);
   const [pendingSub, setPendingSub] = useState<MaterialSubmission[]>([]);
   const [msg, setMsg] = useState('');
   useEffect(() => {
     void listInventory().then(setRows);
     void listOpenRequests().then(setOpenReqs);
+    void listPendingSupervisor().then(setPendingSup);
+    void listPendingQa().then(setPendingQa);
     void listRequests().then((all) => setMyReqs(all.filter((r) => r.requestedBy === session.userId)));
     void listSubmissions().then((all) => setPendingSub(all.filter((s) => s.status === 'Submitted')));
   }, [session.userId]);
@@ -40,7 +44,9 @@ export function Dashboard({ session }: { session: Session }) {
   const isRequester = Boolean(caps?.has('submitRequest') && !caps.has('fulfillRequest') && !caps.has('receive'));
   const isWarehouse = Boolean(caps?.has('receive') || caps?.has('fulfillRequest'));
   const isQa = Boolean(caps?.has('qaDisposition'));
-  const myOpen = myReqs.filter((r) => ['Submitted', 'Picking', 'Partially Issued', 'Issued'].includes(r.status));
+  const myOpen = myReqs.filter((r) =>
+    ['Submitted', 'Pending Supervisor', 'Pending QA', 'Approved', 'Picking', 'Partially Issued', 'Issued'].includes(r.status),
+  );
   const reservedUnpicked = countReservedUnpicked(rows);
 
   async function doExcel() {
@@ -61,8 +67,8 @@ export function Dashboard({ session }: { session: Session }) {
         {(caps?.has('submitRequest') || caps?.has('fulfillRequest')) && (
           <Link className="hero-card" to="/requests">
             <div className="hero-kicker">Main workflow</div>
-            <div className="hero-title">Request material</div>
-            <div className="help">Ask warehouse to pick and issue stock against a requisition.</div>
+            <div className="hero-title">Material Transfer</div>
+            <div className="help">Requestor e-sign → supervisor/QA approve → warehouse pick/issue.</div>
           </Link>
         )}
         {caps?.has('submitMaterial') && (
@@ -76,7 +82,7 @@ export function Dashboard({ session }: { session: Session }) {
           <Link className="hero-card hero-card-alt" to="/requests?view=open">
             <div className="hero-kicker">Warehouse</div>
             <div className="hero-title">Open requests ({openReqs.length})</div>
-            <div className="help">Pick and issue against submitted requisitions (FEFO, scan-verified).</div>
+            <div className="help">Pick and issue approved material transfers (FEFO, scan-verified).</div>
           </Link>
         )}
       </div>
@@ -95,7 +101,8 @@ export function Dashboard({ session }: { session: Session }) {
         <div className="card">
           <h2>Warehouse</h2>
           <div className="row">
-            <KpiLink to="/requests?view=open" label="Open requests" n={openReqs.length} />
+            <KpiLink to="/requests?view=approve" label="Pending supervisor" n={pendingSup.length} />
+            <KpiLink to="/requests?view=open" label="Open transfers" n={openReqs.length} />
             <KpiLink to="/register?filter=reserved" label="Reserved, unpicked" n={reservedUnpicked} />
             <Link className="btn" to="/requests?view=open">
               Fulfill requests
@@ -113,6 +120,7 @@ export function Dashboard({ session }: { session: Session }) {
           <h2>QA</h2>
           <div className="row">
             <KpiLink to="/register?status=Quarantine" label="Quarantine containers" n={qAge.length} />
+            <KpiLink to="/requests?view=approve" label="Pending QA transfers" n={pendingQa.length} />
             <KpiLink to="/submit-material" label="Pending submissions" n={pendingSub.length} />
             <Link className="btn" to="/qa">
               QA disposition

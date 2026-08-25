@@ -40,12 +40,14 @@ Submitted → Approved (QA or supervisor writes Material Master) or Rejected (re
 
 Primary issue path. Direct Issue remains for supervisor/operator **emergency**.
 
-1. `submitRequest` (requester, operator, supervisor, qa, qc): material, qty+UOM, needed-by, destination, purpose/batch, priority. Creates `MR-YYYY-NNNNNN`. Warn if insufficient Released FEFO stock; still allow submit.
-2. **FEFO auto-reserve:** on submit, proposed Released containers (or qty on drums) are reserved (`reservedForRequestId`, `reservedQty`). A second request cannot claim the same serial. Warehouse register shows a **Reserved** badge. Reservation is released on cancel/reject (and when the request is fully issued).
-3. `fulfillRequest` (operator, supervisor only; **not** QA — SoD): open-request queue. FEFO proposal of Released containers, sorted by **location walk path** (site, building, room, rack, shelf, bin). Pick by scanning serials. Wrong material / status / expired → error beep, not added. Partial fill = Partially Issued.
-4. Confirm: picked serials Issued or qty reduced; movement + audit include `requestId`; requester inbox “ready”.
-5. Requester confirms received → Closed (chain of custody).
-6. Cancel if Submitted; warehouse reject with reason.
+1. `submitRequest` (requester, operator, supervisor, qa, qc): material, qty+UOM, to-location, classification, intended use, requestor e-sign. Creates `MR-YYYY-NNNNNN` at **Pending Supervisor**. Warn if insufficient Released FEFO stock; still allow submit. **Do not reserve yet.**
+2. Supervisor e-sign (`approveRequest`) → `Approved` (or `Pending QA` if cell bank/quarantine). QA e-sign (`qaDisposition`) → `Approved`. **FEFO auto-reserve on Approved** (`reservedForRequestId`, `reservedQty`). A second approved transfer cannot claim the same serial. Reservation is released on cancel/reject (and when fully issued).
+3. `fulfillRequest` (operator, supervisor only; **not** QA — SoD): warehouse queue is Approved / Picking / Partially Issued only. FEFO proposal sorted by **location walk path**. Pick by scanning serials. Wrong material / status / expired → error beep. Quarantine pick only after QA e-sign on a cell-bank transfer.
+4. Confirm issue: MM comments or N/A + MM e-sign; picked serials Issued; lot/expiry/location from scanned serials; requester inbox “ready”.
+5. Requester confirms qty received + e-sign → Closed (chain of custody).
+6. Cancel from Pending Supervisor / Pending QA / Submitted; warehouse reject with reason.
+
+See §10 for the paper MTF A/B/C mapping.
 
 Distribution records name which **serials** left, to whom, when, for which request.
 
@@ -75,4 +77,8 @@ Kitting / BOM issue, ASN / CSV inbound, temperature excursion logs.
 ## 9. Certificates / CoA attachments
 
 Operators (`receive`) and QA (`qaDisposition`) may attach CoA, CofC, SDS, Spec, or Other files (PDF, JPEG, PNG, WebP, GIF; max 10 MB) at goods receipt — lot-level on the receipt batch and optionally per serial — or later from the record / scan page. Files are stored in IndexedDB with the serial or receipt batch; this is **not** a validated document management system. Backup JSON includes base64 attachment bytes. Audit `ATTACHMENT_ADD` records file name and SHA-256, not the blob. Append-only (no delete).
+
+## 10. Material Transfer Form mapping (app v1.4)
+
+The in-app Material Transfer is the electronic equivalent of the site paper MTF (A/B/C), not a clone of any branded PDF. **Section A (Requestor):** material, qty+UOM, to-location (LVM / SVM / QC Testing / Warehouse / Other), classification (GMP and/or High Quality), intended use, needed-by; requestor e-sign → status `Pending Supervisor` (`submitRequest`). Supervisor e-sign (`approveRequest`) → `Approved`, or `Pending QA` when cell bank/quarantined. QA e-sign uses existing `qaDisposition` → `Approved`. FEFO reserve runs only on `Approved`. **Section B (Materials Management):** warehouse pick is allowed only for `Approved` / `Picking` / `Partially Issued` (`fulfillRequest`); MM comments or N/A plus MM e-sign on confirm issue; lot/expiry/source location filled from scanned serials. Quarantine serials may be picked only after QA e-sign on a cell-bank/quarantine transfer. **Section C (Receiver):** qty received + receiver e-sign (`confirmRequestReceipt`) → `Closed`. Audit: `REQUEST_SUPERVISOR_APPROVE`, `REQUEST_QA_APPROVE`. Printed card header is `DOC-WH-INV-001 Material Transfer` + requestId.
 

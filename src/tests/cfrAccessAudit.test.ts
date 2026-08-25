@@ -127,14 +127,22 @@ describe('21 CFR 11.10(e) audit on mutations', () => {
 
     await putMaterial();
     const beforeReq = (await listAudit()).length;
-    const req = await submitRequest(sess('requester', 'lab'), {
+    const lab = sess('requester', 'lab');
+    const req = await submitRequest(lab, {
       materialCode: 'API-001',
       qtyRequested: 1,
       uom: 'vial',
       neededBy: '2026-09-01',
-      destination: 'Lab',
-      purpose: 'OQ request',
+      toLocation: 'Warehouse',
+      classification: ['GMP'],
+      intendedUse: 'OQ request',
       priority: 'Routine',
+      requestorEsign: {
+        userId: lab.userId,
+        printedName: lab.fullName,
+        signedAtUtc: '2026-08-24T12:00:00.000Z',
+        meaningOfSignature: 'I request this material transfer.',
+      },
     });
     const afterReq = await listAudit();
     expect(afterReq.length).toBeGreaterThan(beforeReq);

@@ -15,7 +15,7 @@ const PRIMARY = new Set(['/', '/register', '/inbox', '/receive', '/qa', '/audit'
 
 const NAV: { to: string; label: string; cap: Capability }[] = [
   { to: '/', label: 'Dashboard', cap: 'viewDashboard' },
-  { to: '/requests', label: 'Request material', cap: 'submitRequest' },
+  { to: '/requests', label: 'Material Transfer', cap: 'submitRequest' },
   { to: '/submit-material', label: 'Submit material', cap: 'submitMaterial' },
   { to: '/register', label: 'Register', cap: 'viewRegister' },
   { to: '/inbox', label: 'Inbox', cap: 'viewInbox' },
@@ -111,7 +111,7 @@ export function Layout({
   const show = (item: (typeof NAV)[number]) => {
     if (!caps) return false;
     if (item.to === '/access') return caps.has('adminUsers') || caps.has('editPermissionMatrix');
-    if (item.to === '/requests') return caps.has('submitRequest') || caps.has('fulfillRequest');
+    if (item.to === '/requests') return caps.has('submitRequest') || caps.has('fulfillRequest') || caps.has('approveRequest') || caps.has('qaDisposition');
     return caps.has(item.cap);
   };
   const visible = NAV.filter(show);
@@ -178,9 +178,9 @@ export function Layout({
         </div>
       )}
       <div className="workstrip no-print">
-        {(caps?.has('submitRequest') || caps?.has('fulfillRequest')) && (
+        {(caps?.has('submitRequest') || caps?.has('fulfillRequest') || caps?.has('approveRequest')) && (
           <NavLink to="/requests" className="workstrip-btn">
-            Request material
+            Material Transfer
           </NavLink>
         )}
         {caps?.has('submitMaterial') && (

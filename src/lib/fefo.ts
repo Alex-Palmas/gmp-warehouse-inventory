@@ -21,8 +21,11 @@ export function isIssueBlocked(
   rec: FefoCandidate,
   asOf: string,
   forRequestId?: string,
+  opts?: { allowQuarantine?: boolean },
 ): { blocked: boolean; reason: string } {
-  if (rec.status !== 'Released') {
+  const allowQ = Boolean(opts?.allowQuarantine);
+  const statusOk = rec.status === 'Released' || (allowQ && rec.status === 'Quarantine');
+  if (!statusOk) {
     return { blocked: true, reason: `Cannot issue: status is ${rec.status} (Released required)` };
   }
   if (rec.expiryDate && rec.expiryDate < asOf) {
@@ -71,12 +74,13 @@ export function proposeFefoAllocations(
   qtyNeeded: number,
   asOf: string,
   forRequestId?: string,
+  allowedStatuses: string[] = ['Released'],
 ): FefoAllocation[] {
   const eligible = all
     .filter(
       (r) =>
         r.materialCode === materialCode &&
-        r.status === 'Released' &&
+        allowedStatuses.includes(r.status) &&
         freeQty(r, forRequestId) > 0 &&
         (!r.expiryDate || r.expiryDate >= asOf),
     )
@@ -101,8 +105,9 @@ export function proposeFefo(
   qtyNeeded: number,
   asOf: string,
   forRequestId?: string,
+  allowedStatuses: string[] = ['Released'],
 ): FefoCandidate[] {
-  const lines = proposeFefoAllocations(all, materialCode, qtyNeeded, asOf, forRequestId);
+  const lines = proposeFefoAllocations(all, materialCode, qtyNeeded, asOf, forRequestId, allowedStatuses);
   const bySerial = new Map(all.map((r) => [r.serial, r]));
   return lines.map((l) => bySerial.get(l.serial)).filter((r): r is FefoCandidate => Boolean(r));
 }

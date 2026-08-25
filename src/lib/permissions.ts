@@ -142,6 +142,7 @@ export function defaultMatrixRows(): MatrixRows {
       'backupRestore',
       'submitMaterial',
       'submitRequest',
+      'approveRequest',
       'fulfillRequest',
       'approveMaterial',
       'rejectMaterial',

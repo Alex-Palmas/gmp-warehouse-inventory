@@ -30,7 +30,7 @@ View: viewDashboard, viewRegister, viewAudit, viewAccessLog, scanLookup, viewInb
 
 Inventory: receive, transfer, issue, returnToStock, cycleCount, reprintLabel
 
-Requests & sampling: submitMaterial, submitRequest, fulfillRequest, samplePull
+Requests & sampling: submitMaterial, submitRequest, approveRequest, fulfillRequest, samplePull
 
 QA: hold, qaDisposition, destroy, eSign
 

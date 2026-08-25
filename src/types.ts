@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.3.9';
+export const APP_VERSION = '1.4.0';
 export const DOC_ID = 'DOC-WH-INV-001';
 export const DOC_VERSION = '1.3';
 export const VALIDATION_BANNER =
@@ -34,6 +34,7 @@ export const CAPABILITIES = [
   'eSign',
   'submitMaterial',
   'submitRequest',
+  'approveRequest',
   'fulfillRequest',
   'samplePull',
   'viewInbox',
@@ -68,6 +69,7 @@ export const CAPABILITY_GROUPS: { id: string; label: string; caps: Capability[] 
       'approveMaterial',
       'rejectMaterial',
       'submitRequest',
+      'approveRequest',
       'cancelRequest',
       'rejectRequest',
       'confirmRequestReceipt',
@@ -119,6 +121,7 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   eSign: 'Apply electronic signature',
   submitMaterial: 'Submit new material',
   submitRequest: 'Submit material request',
+  approveRequest: 'Approve material transfer (supervisor)',
   fulfillRequest: 'Pick / fulfill requests',
   samplePull: 'Pull sample / retain',
   viewInbox: 'View inbox',
@@ -286,6 +289,9 @@ export type RequestPriority = (typeof REQUEST_PRIORITIES)[number];
 
 export const REQUEST_STATUSES = [
   'Submitted',
+  'Pending Supervisor',
+  'Pending QA',
+  'Approved',
   'Picking',
   'Partially Issued',
   'Issued',
@@ -294,6 +300,12 @@ export const REQUEST_STATUSES = [
   'Rejected',
 ] as const;
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
+
+export const TO_LOCATIONS = ['LVM', 'SVM', 'QC Testing', 'Warehouse', 'Other'] as const;
+export type ToLocation = (typeof TO_LOCATIONS)[number];
+
+export const CLASSIFICATIONS = ['GMP', 'High Quality'] as const;
+export type MaterialClassification = (typeof CLASSIFICATIONS)[number];
 
 export const SUBMISSION_STATUSES = ['Submitted', 'Approved', 'Rejected'] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
@@ -512,7 +524,9 @@ export type AuditAction =
   | 'EXPORT'
   | 'PASSWORD_RESET'
   | 'REQUEST_UNPICK'
-  | 'ATTACHMENT_ADD';
+  | 'ATTACHMENT_ADD'
+  | 'REQUEST_SUPERVISOR_APPROVE'
+  | 'REQUEST_QA_APPROVE';
 
 export interface PickedLine {
   serial: string;
@@ -542,6 +556,23 @@ export interface MaterialRequest {
   rejectReason?: string;
   comments: string;
   stockWarning?: string;
+  /** MTF Section A — to-location radios (LVM / SVM / QC Testing / Warehouse / Other). */
+  toLocation?: ToLocation;
+  destinationOther?: string;
+  classification?: MaterialClassification[];
+  intendedUse?: string;
+  cellBankOrQuarantine?: boolean;
+  qtyReceived?: number;
+  sourceLot?: string;
+  sourceExpiry?: string;
+  sourceLocation?: string;
+  mmComments?: string;
+  mmCommentsNa?: boolean;
+  requestorEsign?: ESign;
+  supervisorEsign?: ESign;
+  qaEsign?: ESign;
+  mmEsign?: ESign;
+  receiverEsign?: ESign;
 }
 
 export interface MaterialSubmission {
