@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.3.6';
+export const APP_VERSION = '1.3.7';
 export const DOC_ID = 'DOC-WH-INV-001';
 export const DOC_VERSION = '1.3';
 export const VALIDATION_BANNER =
@@ -426,6 +426,8 @@ export interface AuditEntry {
   timestampLocal: string;
   userId: string;
   userName: string;
+  /** Matrix role at the time of the action (view-as overlay role when presentation super is simulating). */
+  role: string;
   action: string;
   recordId: string;
   field: string;

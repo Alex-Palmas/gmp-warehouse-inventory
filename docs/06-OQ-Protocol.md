@@ -158,9 +158,9 @@ Transfer S1 to a new bin with reason. Movement log + audit location old/new. **P
 
 ---
 
-### OQ-14 Dashboard (URS-17)
+### OQ-14 Dashboard (URS-17, URS-27)
 
-Confirm quarantine count includes S2; expired list includes 000007; 30/90 day lists populated vs current date. **Pass/Fail:** ___
+Confirm quarantine count includes S2; expired list includes 000007; 30/90 day lists populated vs current date. KPI tiles are clickable and filter the register / request queue (URS-27). **Pass/Fail:** ___
 
 ---
 
@@ -241,7 +241,7 @@ OQ is [ ] Passed  [ ] Passed with deviations  [ ] Failed
 
 ---
 
-### OQ-21 Per-container serialization (URS serialization)
+### OQ-21 Per-container serialization (URS-21)
 
 **Steps**
 1. As `wh`, Goods Receipt: material with sampling not required, N containers = 5, container type Vial, qty per container = 1 (e.g. 5 × 1 vial). Submit.
@@ -254,7 +254,7 @@ OQ is [ ] Passed  [ ] Passed with deviations  [ ] Failed
 
 ---
 
-### OQ-22 Material request → pick → issue (URS request)
+### OQ-22 Material request → pick → issue (URS-22)
 
 **Steps**
 1. As `lab` (change temp password `LabUser123!x`). Request material: typeahead a Released material, qty, needed-by, Enter. Note request id MR-… and any FEFO reserve.
@@ -301,10 +301,10 @@ OQ is [ ] Passed  [ ] Passed with deviations  [ ] Failed
 
 **Steps**
 1. As `wh`, receive 2 containers. Note serials S1, S2.
-2. Open Audit (`#/audit`). Newest first. Filter record = S1 (query param `record=`). Confirm RECEIVE row: UTC + local, userId=`wh`, old blank, new Quarantine, reason includes receipt batch.
+2. Open Audit (`#/audit`). Newest first. Filter record = S1 (query param `record=`). Confirm RECEIVE row: UTC + local, userId=`wh`, role=operator (or `wh`'s role), old blank, new Quarantine, reason includes receipt batch.
 3. Confirm no edit/delete controls. Export CSV (if `exportAudit` / `exportReports`). Open record detail for S1 — same audit rows via `listAuditForRecord`.
 
-**Expected:** Contemporaneous append-only row per serial. **Pass/Fail:** ___
+**Expected:** Contemporaneous append-only row per serial; RECEIVE includes role=operator (or `wh`'s role). **Pass/Fail:** ___
 
 ---
 
@@ -317,4 +317,17 @@ OQ is [ ] Passed  [ ] Passed with deviations  [ ] Failed
 4. Filter Audit action=`REQUEST_SUBMIT` and date from/to. Deep-link URL retains filters.
 
 **Expected:** Request lifecycle fully trailed; reason on cancel/reject. **Pass/Fail:** ___
+
+---
+
+### OQ-29 Session idle timeout writes SESSION_TIMEOUT (11.10(d)(e))
+
+**Steps**
+1. Log in as `wh`. Idle 15 min (or simulate by setting `lastActivityUtc` in sessionStorage to 16 min ago) then wait for the 15s poll.
+2. Expect audit SESSION_TIMEOUT with userId and role, then the login screen.
+3. Log in again. Confirm a manual **Log out** still writes LOGOUT not SESSION_TIMEOUT.
+4. Open Audit. Role column is visible after User. Export CSV and Excel — both include Role. Old rows without role show blank.
+
+**Expected:** Idle timeout writes SESSION_TIMEOUT (not LOGOUT); manual logout writes LOGOUT; Role column/CSV/Excel present; missing role serializes blank. **Pass/Fail:** ___
+
 

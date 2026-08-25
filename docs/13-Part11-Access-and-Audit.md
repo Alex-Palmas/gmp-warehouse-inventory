@@ -54,14 +54,14 @@ Rule: exported mutations in `inventory.ts`, `requests.ts`, `submissions.ts`, `au
 | Request submit / pick / unpick / issue / cancel / reject / confirm | REQUEST_* | `removePick` writes REQUEST_UNPICK |
 | Material submit / approve / reject | MATERIAL_* | |
 | User create / update / unlock / password change or reset | USER_* / USER_UNLOCK / PASSWORD_CHANGE / PASSWORD_RESET | |
-| LOGIN / LOGOUT / LOGIN_FAIL / LOCKOUT | same | Fail/lockout use `appendAuditSystem` (still writes `userId`) |
+| LOGIN / LOGOUT / SESSION_TIMEOUT / LOGIN_FAIL / LOCKOUT | same | Fail/lockout use `appendAuditSystem` (still writes `userId`). Idle timeout writes SESSION_TIMEOUT not LOGOUT. |
 | Matrix save (per cell), role create | MATRIX_SAVE / ROLE_CREATE | |
 | Label reprint, Excel export, audit CSV, backup/restore | PRINT_LABEL / EXPORT / BACKUP / RESTORE | |
 | Barcode scan of a serial | SCAN | `recordId` = serial; location barcodes skipped |
 | Inbox mark-read | — | Not a GMP record; no audit |
 | First-boot seed | — | System seed; documented, not audited |
 
-Fields: UTC, local (America/Los_Angeles), userId, userName, action, recordId, field, oldValue, newValue, reasonForChange, meaningOfSignature. Reason is required for corrections (cycle count, qty adjust, cancel, reject, role change, deactivate).
+Fields: UTC, local (America/Los_Angeles), userId, userName, **role**, action, recordId, field, oldValue, newValue, reasonForChange, meaningOfSignature. Reason is required for corrections (cycle count, qty adjust, cancel, reject, role change, deactivate). Presentation **View as** overlays the matrix role on audit `role` but `userId` stays the authenticated user (`super`). Inbox mark-read is still not audited. First-boot seed is still not audited.
 
 Audit UI (`#/audit`): filters user / action / record / date from-to as query params (deep-linkable), newest first, CSV export (`exportAudit` or `exportReports`). Record detail lists `listAuditForRecord`.
 

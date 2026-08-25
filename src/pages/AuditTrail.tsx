@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { AuditEntry, Session } from '../types';
 import { appendAudit, formatAuditCsv, listAudit } from '../lib/audit';
 import { downloadBlob } from '../lib/excelExport';
+import { hasCapability } from '../lib/permissions';
 import { useCap } from '../hooks/useCap';
 import { todayIsoDateInTz } from '../lib/dates';
 
@@ -49,6 +50,8 @@ export function AuditTrail({ session }: { session: Session }) {
   async function exportCsv() {
     setErr('');
     try {
+      const allowed = (await hasCapability(session, 'exportAudit')) || (await hasCapability(session, 'exportReports'));
+      if (!allowed) throw new Error('Export audit capability required');
       const csv = formatAuditCsv(filtered);
       await appendAudit(session, {
         action: 'EXPORT',
@@ -118,6 +121,7 @@ export function AuditTrail({ session }: { session: Session }) {
             <th>UTC</th>
             <th>Local</th>
             <th>User</th>
+            <th>Role</th>
             <th>Action</th>
             <th>Record</th>
             <th>Field</th>
@@ -135,6 +139,7 @@ export function AuditTrail({ session }: { session: Session }) {
               <td>
                 {a.userName} ({a.userId})
               </td>
+              <td>{a.role || ''}</td>
               <td>{a.action}</td>
               <td className="mono">{a.recordId}</td>
               <td>{a.field}</td>

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import type { Session } from '../types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { parseScanPayload } from '../lib/serial';
 import { isLocationCode } from '../lib/locations';
@@ -8,7 +9,7 @@ import { loadSession } from '../lib/auth';
 
 export const SCAN_EVENT = 'gmp-wh-scan';
 
-export function ScanBox() {
+export function ScanBox({ session }: { session?: Session } = {}) {
   const [v, setV] = useState('');
   const nav = useNavigate();
   const loc = useLocation();
@@ -28,9 +29,9 @@ export function ScanBox() {
       new CustomEvent(SCAN_EVENT, { detail: { serial: s, locationCode: isLocationCode(s) ? s : undefined } }),
     );
     if (!isLocationCode(s)) {
-      const session = loadSession();
-      if (session) {
-        void appendAudit(session, {
+      const ssn = session ?? loadSession();
+      if (ssn) {
+        void appendAudit(ssn, {
           action: 'SCAN',
           recordId: s,
           field: 'scan',

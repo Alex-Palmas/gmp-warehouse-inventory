@@ -45,9 +45,21 @@ export function loadSession(): Session | null {
     const s = JSON.parse(raw) as Session;
     const last = Date.parse(s.lastActivityUtc);
     if (Number.isNaN(last) || Date.now() - last > SESSION_IDLE_MS) {
-      sessionStorage.removeItem(SESSION_KEY);
       return null;
     }
+    s.role = resolveRoleId(s.role);
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+/** Parse SESSION_KEY with no idle check. Used to attribute SESSION_TIMEOUT after loadSession() returns null. */
+export function peekStoredSession(): Session | null {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  try {
+    const s = JSON.parse(raw) as Session;
     s.role = resolveRoleId(s.role);
     return s;
   } catch {
@@ -102,15 +114,26 @@ function normalizeUser(raw: UserRecord): UserRecord {
 export async function login(userId: string, password: string): Promise<Session> {
   const db = await getDb();
   const raw = (await db.get('users', userId.trim())) as UserRecord | undefined;
-  const fail = async (uid: string, name: string, detail: string, event: 'LOGIN_FAIL' | 'LOCKOUT' = 'LOGIN_FAIL') => {
+  const fail = async (
+    uid: string,
+    name: string,
+    detail: string,
+    event: 'LOGIN_FAIL' | 'LOCKOUT' = 'LOGIN_FAIL',
+    role = '',
+  ) => {
     await logAccess(uid, name, event, detail);
-    await appendAuditSystem(uid, name, {
-      action: event,
-      recordId: uid,
-      field: 'login',
-      newValue: event,
-      reasonForChange: detail,
-    });
+    await appendAuditSystem(
+      uid,
+      name,
+      {
+        action: event,
+        recordId: uid,
+        field: 'login',
+        newValue: event,
+        reasonForChange: detail,
+      },
+      role,
+    );
     throw new Error(GENERIC_LOGIN_ERROR);
   };
   if (!raw || !raw.active) {
@@ -118,31 +141,41 @@ export async function login(userId: string, password: string): Promise<Session> 
   }
   const user = normalizeUser(raw as UserRecord);
   if (isAccountLocked(user)) {
-    await fail(user.userId, user.fullName, user.lockReason ?? 'Account locked', 'LOCKOUT');
+    await fail(user.userId, user.fullName, user.lockReason ?? 'Account locked', 'LOCKOUT', user.role);
   }
   const check = await verifyPasswordFlexible(password, user.salt, user.passwordHash, user.algorithm);
   if (!check.ok) {
     const { user: next, locked } = applyFailedLogin(user, Date.now());
     await db.put('users', next);
     await logAccess(user.userId, user.fullName, 'LOGIN_FAIL', 'Bad password');
-    await appendAuditSystem(user.userId, user.fullName, {
-      action: 'LOGIN_FAIL',
-      recordId: user.userId,
-      field: 'failedAttempts',
-      oldValue: String(user.failedAttempts ?? 0),
-      newValue: String(next.failedAttempts),
-      reasonForChange: 'Bad password',
-    });
+    await appendAuditSystem(
+      user.userId,
+      user.fullName,
+      {
+        action: 'LOGIN_FAIL',
+        recordId: user.userId,
+        field: 'failedAttempts',
+        oldValue: String(user.failedAttempts ?? 0),
+        newValue: String(next.failedAttempts),
+        reasonForChange: 'Bad password',
+      },
+      user.role,
+    );
     if (locked) {
       await logAccess(user.userId, user.fullName, 'LOCKOUT', next.lockReason ?? 'Too many failed login attempts');
-      await appendAuditSystem(user.userId, user.fullName, {
-        action: 'LOCKOUT',
-        recordId: user.userId,
-        field: 'lockedUntilUtc',
-        oldValue: '',
-        newValue: next.lockedUntilUtc ?? '',
-        reasonForChange: next.lockReason ?? 'Too many failed login attempts',
-      });
+      await appendAuditSystem(
+        user.userId,
+        user.fullName,
+        {
+          action: 'LOCKOUT',
+          recordId: user.userId,
+          field: 'lockedUntilUtc',
+          oldValue: '',
+          newValue: next.lockedUntilUtc ?? '',
+          reasonForChange: next.lockReason ?? 'Too many failed login attempts',
+        },
+        user.role,
+      );
     }
     throw new Error(GENERIC_LOGIN_ERROR);
   }
@@ -178,10 +211,17 @@ export async function login(userId: string, password: string): Promise<Session> 
   return session;
 }
 
-export async function logout(session: Session | null): Promise<void> {
+export async function logout(
+  session: Session | null,
+  action: 'LOGOUT' | 'SESSION_TIMEOUT' = 'LOGOUT',
+): Promise<void> {
   if (session) {
-    await logAccess(session.userId, session.fullName, 'LOGOUT', '');
-    await appendAudit(session, { action: 'LOGOUT', recordId: session.userId });
+    await logAccess(session.userId, session.fullName, action, '');
+    await appendAudit(session, {
+      action,
+      recordId: session.userId,
+      reasonForChange: action === 'SESSION_TIMEOUT' ? 'Idle timeout (15 min)' : '',
+    });
   }
   clearSession();
 }

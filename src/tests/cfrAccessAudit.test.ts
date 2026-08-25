@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as audit from '../lib/audit';
 import { AUDIT_MUTATION_API, listAudit } from '../lib/audit';
-import { changeOwnPassword } from '../lib/auth';
+import { changeOwnPassword, logout } from '../lib/auth';
 import { hashPassword, randomSalt } from '../lib/crypto';
 import { resetDbConnection, getDb } from '../lib/db';
 import { emptyLocation } from '../components/fields';
@@ -174,5 +174,50 @@ describe('21 CFR 11.10(e) audit on mutations', () => {
     expect(AUDIT_MUTATION_API.updateAudit).toBe(false);
     expect(AUDIT_MUTATION_API.deleteAudit).toBe(false);
     expect(AUDIT_MUTATION_API.appendAudit).toBe(true);
+  });
+
+  it('receiveGoods as operator wh writes RECEIVE with role and userId', async () => {
+    const recs = await receiveGoods(sess('operator', 'wh'), {
+      materialCode: 'API-001',
+      materialName: 'Ibuprofen',
+      itemType: 'API',
+      gradeSpec: 'USP',
+      pharmacopeia: 'USP',
+      manufacturer: 'Demo',
+      manufacturerLot: 'L1',
+      supplier: 'Sup',
+      supplierLot: 'S1',
+      poDeliveryNote: 'PO-1',
+      coaNumber: 'COA-1',
+      internalLot: 'IL-1',
+      numberOfContainers: 1,
+      containerType: 'Vial',
+      qtyPerContainer: 1,
+      uom: 'vial',
+      dateOfManufacture: '2026-01-01',
+      receiptDate: '2026-08-01',
+      expiryDate: '2028-01-01',
+      retestDate: '',
+      location: emptyLocation(),
+      storageCondition: 'CRT 15–25 °C',
+      samplingRequired: false,
+      linkedSampleIds: '',
+      comments: 'role audit',
+    });
+    const rows = await listAudit();
+    const rec = rows.find((a) => a.action === 'RECEIVE' && a.recordId === recs[0].serial);
+    expect(rec).toBeTruthy();
+    expect(rec!.role).toBe('operator');
+    expect(rec!.userId).toBe('wh');
+  });
+
+  it('logout SESSION_TIMEOUT writes SESSION_TIMEOUT; default still writes LOGOUT', async () => {
+    await logout(sess('operator', 'wh'), 'SESSION_TIMEOUT');
+    let rows = await listAudit();
+    expect(rows.some((a) => a.action === 'SESSION_TIMEOUT' && a.userId === 'wh' && a.role === 'operator')).toBe(true);
+    await logout(sess('operator', 'wh'));
+    rows = await listAudit();
+    expect(rows.some((a) => a.action === 'LOGOUT' && a.userId === 'wh' && a.role === 'operator')).toBe(true);
+    expect(rows.filter((a) => a.action === 'SESSION_TIMEOUT').length).toBe(1);
   });
 });

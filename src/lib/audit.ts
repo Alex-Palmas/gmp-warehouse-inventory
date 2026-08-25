@@ -22,6 +22,7 @@ export interface AuditInput {
 function buildEntry(
   userId: string,
   userName: string,
+  role: string,
   input: AuditInput,
 ): AuditEntry {
   const utc = nowUtcIso();
@@ -31,6 +32,7 @@ function buildEntry(
     timestampLocal: toDisplayLocal(utc),
     userId,
     userName,
+    role: role ?? '',
     action: input.action,
     recordId: input.recordId,
     field: input.field ?? '',
@@ -42,7 +44,7 @@ function buildEntry(
 }
 
 export async function appendAudit(session: Session, input: AuditInput): Promise<AuditEntry> {
-  const entry = buildEntry(session.userId, session.fullName, input);
+  const entry = buildEntry(session.userId, session.fullName, session.role ?? '', input);
   const db = await getDb();
   await db.add('audit', entry);
   return entry;
@@ -51,13 +53,15 @@ export async function appendAudit(session: Session, input: AuditInput): Promise<
 /**
  * Audit without an authenticated session (LOGIN_FAIL, LOCKOUT). Still writes
  * userId so the trail remains attributable. Add-only, same store.
+ * Pass role when the account is known; unknown users get ''.
  */
 export async function appendAuditSystem(
   userId: string,
   userName: string,
   input: AuditInput,
+  role = '',
 ): Promise<AuditEntry> {
-  const entry = buildEntry(userId || 'unknown', userName || '', input);
+  const entry = buildEntry(userId || 'unknown', userName || '', role ?? '', input);
   const db = await getDb();
   await db.add('audit', entry);
   return entry;
@@ -75,21 +79,24 @@ export async function listAuditForRecord(recordId: string): Promise<AuditEntry[]
   return all.filter((e) => e.recordId === recordId);
 }
 
+export const AUDIT_CSV_HEADERS = [
+  'id',
+  'timestampUtc',
+  'timestampLocal',
+  'userId',
+  'userName',
+  'role',
+  'action',
+  'recordId',
+  'field',
+  'oldValue',
+  'newValue',
+  'reasonForChange',
+  'meaningOfSignature',
+] as const;
+
 export function formatAuditCsv(rows: AuditEntry[]): string {
-  const headers = [
-    'id',
-    'timestampUtc',
-    'timestampLocal',
-    'userId',
-    'userName',
-    'action',
-    'recordId',
-    'field',
-    'oldValue',
-    'newValue',
-    'reasonForChange',
-    'meaningOfSignature',
-  ];
+  const headers = [...AUDIT_CSV_HEADERS];
   const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [headers.join(',')];
   for (const r of rows) {
@@ -100,6 +107,7 @@ export function formatAuditCsv(rows: AuditEntry[]): string {
         r.timestampLocal,
         r.userId,
         r.userName,
+        r.role || '',
         r.action,
         r.recordId,
         r.field,

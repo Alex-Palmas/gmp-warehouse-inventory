@@ -194,7 +194,7 @@ export function Layout({
           </NavLink>
         )}
       </div>
-      <ScanBox />
+      <ScanBox session={effective} />
       {flash && (
         <div className={`scan-flash scan-flash-${flash.kind}`} role="status">
           {flash.message}

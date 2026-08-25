@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import type { Capability, Session } from './types';
-import { loadSession, touchSession, logout } from './lib/auth';
+import { loadSession, peekStoredSession, touchSession, logout } from './lib/auth';
 import { ensureSeeded } from './lib/seed';
 import { hasCapability } from './lib/permissions';
 import { Layout } from './components/Layout';
@@ -117,10 +117,16 @@ export default function App() {
     const t = window.setInterval(() => {
       const s = loadSession();
       if (!s) {
-        void logout(session).finally(() => {
+        const expired = peekStoredSession();
+        if (expired) {
+          void logout(expired, 'SESSION_TIMEOUT').finally(() => {
+            setSession(null);
+            nav('/login');
+          });
+        } else {
           setSession(null);
           nav('/login');
-        });
+        }
       }
     }, 15_000);
     return () => {

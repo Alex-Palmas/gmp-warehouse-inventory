@@ -46,4 +46,10 @@ describe('presentation view-as', () => {
     expect(defaultAllows(ro.role, 'viewDashboard')).toBe(true);
     expect(defaultAllows(ro.role, 'submitRequest')).toBe(false);
   });
+
+  it('applyViewAs keeps userId super while overlaying operator role', () => {
+    const overlaid = applyViewAs(superSession(), 'operator');
+    expect(overlaid.userId).toBe('super');
+    expect(overlaid.role).toBe('operator');
+  });
 });
