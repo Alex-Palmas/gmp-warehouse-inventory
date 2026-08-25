@@ -160,7 +160,7 @@ h3 { margin: 10px 0 6px; font-size: 13px; }
 .nav-more-menu {
   position: absolute;
   right: 0;
-  top: calc(100% + 6px);
+  top: 100%;
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line);
@@ -210,6 +210,18 @@ input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: var(--accent);
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink) !important;
+  caret-color: var(--ink);
+  box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+  border-color: var(--line);
+  transition: background-color 99999s ease-out 0s;
 }
 textarea { min-height: 72px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

@@ -166,14 +166,14 @@ function UsersPanel({
   return (
     <div>
       {canUsers && (
-        <form className="card grid grid-4" onSubmit={add}>
+        <form className="card grid grid-4" onSubmit={add} autoComplete="off">
           <label>
             User ID
-            <input value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })} required />
+            <input value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })} required autoComplete="off" />
           </label>
           <label>
             Full name
-            <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />
+            <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required autoComplete="off" />
           </label>
           <label>
             Role
@@ -187,7 +187,7 @@ function UsersPanel({
           </label>
           <label>
             Temporary password
-            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required autoComplete="new-password" />
           </label>
           <p className="help" style={{ gridColumn: '1 / -1' }}>
             Temp password must meet policy (12+ chars, upper/lower/digit/special). User must change it

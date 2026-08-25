@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FLASH_EVENT } from '../lib/scanFeedback';
 import type { Capability, Session } from '../types';
 import { DOC_ID, DOC_VERSION, VALIDATION_BANNER, APP_VERSION, PRESENTATION_ROLE_ID } from '../types';
@@ -51,6 +51,9 @@ export function Layout({
   const nav = useNavigate();
   const caps = useCaps(effective);
   const canViewAs = session.role === PRESENTATION_ROLE_ID;
+  const loc = useLocation();
+  const moreRef = useRef<HTMLDetailsElement>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; message: string } | null>(null);
   useEffect(() => {
@@ -76,6 +79,24 @@ export function Layout({
       clearInterval(t);
     };
   }, [session.userId]);
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [loc.pathname]);
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onDown(e: PointerEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMoreOpen(false);
+    }
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [moreOpen]);
   async function doLogout() {
     await logout(session);
     onLogout();
@@ -108,12 +129,15 @@ export function Layout({
             <span key={item.to}>{link(item.to, item.label, item.to === '/inbox' ? unread : 0)}</span>
           ))}
           {more.length > 0 && (
-            <details className="nav-more">
+            <details
+              ref={moreRef}
+              className="nav-more"
+              open={moreOpen}
+              onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}
+              onMouseLeave={() => setMoreOpen(false)}
+            >
               <summary>More</summary>
-              <div className="nav-more-menu" onClick={(e) => {
-                  const d = (e.currentTarget as HTMLElement).closest('details');
-                  if (d) d.removeAttribute('open');
-                }}>
+              <div className="nav-more-menu" onClick={() => setMoreOpen(false)}>
                 {more.map((item) => (
                   <span key={item.to}>{link(item.to, item.label, item.to === '/inbox' ? unread : 0)}</span>
                 ))}

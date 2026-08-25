@@ -5,7 +5,7 @@ Standalone **system of record** for warehouse containers in a pharmaceutical / b
 
 This application is a technical control set that *can support* 21 CFR Part 11, 21 CFR 211 warehouse/records, EU GMP Annex 11, ALCOA+, and GAMP 5 **after** the site executes IQ/OQ/PQ, trains users, and adopts SOPs. It is **not** certified, validated, or fully compliant as shipped.
 
-Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.5`
+Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.6`
 
 ## Intended use
 
