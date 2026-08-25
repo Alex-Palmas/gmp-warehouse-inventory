@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import type { Capability, Session } from './types';
 import { loadSession, touchSession, logout } from './lib/auth';
 import { ensureSeeded } from './lib/seed';
 import { hasCapability } from './lib/permissions';
 import { Layout } from './components/Layout';
+import { applyViewAs, loadViewAs, saveViewAs } from './lib/viewAs';
 import { CapChecking, CapDenied } from './components/CapGuard';
 import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
@@ -29,8 +30,22 @@ import { SubmitMaterial } from './pages/SubmitMaterial';
 import { Inbox } from './pages/Inbox';
 import { Samples } from './pages/Samples';
 
-function Guard({ session, onLogout }: { session: Session; onLogout: () => void }) {
-  return <Layout session={session} onLogout={onLogout} />;
+function Guard({
+  session,
+  effective,
+  viewAs,
+  onViewAs,
+  onLogout,
+}: {
+  session: Session;
+  effective: Session;
+  viewAs: string;
+  onViewAs: (roleId: string) => void;
+  onLogout: () => void;
+}) {
+  return (
+    <Layout session={session} effective={effective} viewAs={viewAs} onViewAs={onViewAs} onLogout={onLogout} />
+  );
 }
 
 function CapRoute({
@@ -65,8 +80,18 @@ function AccessRoute({ session }: { session: Session }) {
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const [viewAs, setViewAs] = useState(loadViewAs);
   const [ready, setReady] = useState(false);
   const nav = useNavigate();
+  const effective = useMemo(
+    () => (session ? applyViewAs(session, viewAs) : null),
+    [session, viewAs],
+  );
+
+  function changeViewAs(roleId: string) {
+    saveViewAs(roleId);
+    setViewAs(roleId);
+  }
 
   useEffect(() => {
     ensureSeeded()
@@ -124,23 +149,36 @@ export default function App() {
     );
   }
 
+  if (!effective) return <div className="page">Loading session…</div>;
+
   return (
     <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/change-password" element={<ChangePassword session={session} onChanged={setSession} />} />
-      <Route path="/" element={<Guard session={session} onLogout={() => setSession(null)} />}>
+      <Route
+        path="/"
+        element={
+          <Guard
+            session={session}
+            effective={effective}
+            viewAs={viewAs}
+            onViewAs={changeViewAs}
+            onLogout={() => setSession(null)}
+          />
+        }
+      >
         <Route
           index
           element={
-            <CapRoute session={session} cap="viewDashboard">
-              <Dashboard session={session} />
+            <CapRoute session={effective} cap="viewDashboard">
+              <Dashboard session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="register"
           element={
-            <CapRoute session={session} cap="viewRegister">
+            <CapRoute session={effective} cap="viewRegister">
               <InventoryRegister />
             </CapRoute>
           }
@@ -149,104 +187,104 @@ export default function App() {
         <Route
           path="receive"
           element={
-            <CapRoute session={session} cap="receive">
-              <GoodsReceipt session={session} />
+            <CapRoute session={effective} cap="receive">
+              <GoodsReceipt session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="qa"
           element={
-            <CapRoute session={session} cap="qaDisposition">
-              <QADisposition session={session} />
+            <CapRoute session={effective} cap="qaDisposition">
+              <QADisposition session={effective} />
             </CapRoute>
           }
         />
-        <Route path="requests" element={<Requests session={session} />} />
+        <Route path="requests" element={<Requests session={effective} />} />
         <Route
           path="submit-material"
           element={
-            <CapRoute session={session} cap="submitMaterial">
-              <SubmitMaterial session={session} />
+            <CapRoute session={effective} cap="submitMaterial">
+              <SubmitMaterial session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="inbox"
           element={
-            <CapRoute session={session} cap="viewInbox">
-              <Inbox session={session} />
+            <CapRoute session={effective} cap="viewInbox">
+              <Inbox session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="samples"
           element={
-            <CapRoute session={session} cap="samplePull">
-              <Samples session={session} />
+            <CapRoute session={effective} cap="samplePull">
+              <Samples session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="transfer"
           element={
-            <CapRoute session={session} cap="transfer">
-              <LocationTransfer session={session} />
+            <CapRoute session={effective} cap="transfer">
+              <LocationTransfer session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="issue"
           element={
-            <CapRoute session={session} cap="issue">
-              <IssueDispense session={session} />
+            <CapRoute session={effective} cap="issue">
+              <IssueDispense session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="return"
           element={
-            <CapRoute session={session} cap="returnToStock">
-              <ReturnToStock session={session} />
+            <CapRoute session={effective} cap="returnToStock">
+              <ReturnToStock session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="hold"
           element={
-            <CapRoute session={session} cap="hold">
-              <Hold session={session} />
+            <CapRoute session={effective} cap="hold">
+              <Hold session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="count"
           element={
-            <CapRoute session={session} cap="cycleCount">
-              <CycleCount session={session} />
+            <CapRoute session={effective} cap="cycleCount">
+              <CycleCount session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="destroy"
           element={
-            <CapRoute session={session} cap="destroy">
-              <Destruction session={session} />
+            <CapRoute session={effective} cap="destroy">
+              <Destruction session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="reprint"
           element={
-            <CapRoute session={session} cap="reprintLabel">
-              <LabelReprint session={session} />
+            <CapRoute session={effective} cap="reprintLabel">
+              <LabelReprint session={effective} />
             </CapRoute>
           }
         />
         <Route
           path="scan"
           element={
-            <CapRoute session={session} cap="scanLookup">
+            <CapRoute session={effective} cap="scanLookup">
               <ScanLookup />
             </CapRoute>
           }
@@ -254,18 +292,18 @@ export default function App() {
         <Route
           path="materials"
           element={
-            <CapRoute session={session} cap="adminMaterials">
-              <MaterialMaster session={session} />
+            <CapRoute session={effective} cap="adminMaterials">
+              <MaterialMaster session={effective} />
             </CapRoute>
           }
         />
-        <Route path="access" element={<AccessRoute session={session} />} />
+        <Route path="access" element={<AccessRoute session={effective} />} />
         <Route path="users" element={<Navigate to="/access" replace />} />
         <Route
           path="audit"
           element={
-            <CapRoute session={session} cap="viewAudit">
-              <AuditTrail session={session} />
+            <CapRoute session={effective} cap="viewAudit">
+              <AuditTrail session={effective} />
             </CapRoute>
           }
         />

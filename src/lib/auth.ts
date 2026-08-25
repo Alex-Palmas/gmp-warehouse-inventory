@@ -11,6 +11,7 @@ import { nowUtcIso } from './dates';
 import { newId } from './ids';
 import { appendAudit, appendAuditSystem } from './audit';
 import { assertCapability, assertMayAssignRole, getRole, hasCapability, resolveRoleId } from './permissions';
+import { clearViewAs } from './viewAs';
 import {
   assertPasswordPolicy,
   nextPasswordHistory,
@@ -62,6 +63,7 @@ export function touchSession(s: Session): Session {
 
 export function clearSession(): void {
   sessionStorage.removeItem(SESSION_KEY);
+  clearViewAs();
 }
 
 export function persistSession(s: Session): void {

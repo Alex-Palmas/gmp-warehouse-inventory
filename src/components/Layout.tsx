@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { FLASH_EVENT } from '../lib/scanFeedback';
 import type { Capability, Session } from '../types';
-import { DOC_ID, DOC_VERSION, VALIDATION_BANNER, APP_VERSION } from '../types';
+import { DOC_ID, DOC_VERSION, VALIDATION_BANNER, APP_VERSION, PRESENTATION_ROLE_ID } from '../types';
 import { ScanBox } from './ScanBox';
 import { ThemeToggle } from './ThemeToggle';
 import { logout } from '../lib/auth';
 import { toDisplayLocal } from '../lib/dates';
 import { useCaps } from '../hooks/useCap';
 import { unreadInboxCount } from '../lib/inbox';
+import { viewAsOptions } from '../lib/viewAs';
 
 const PRIMARY = new Set(['/', '/register', '/inbox', '/receive', '/qa', '/audit', '/access']);
 
@@ -34,9 +35,22 @@ const NAV: { to: string; label: string; cap: Capability }[] = [
   { to: '/audit', label: 'Audit', cap: 'viewAudit' },
 ];
 
-export function Layout({ session, onLogout }: { session: Session; onLogout: () => void }) {
+export function Layout({
+  session,
+  effective,
+  viewAs,
+  onViewAs,
+  onLogout,
+}: {
+  session: Session;
+  effective: Session;
+  viewAs: string;
+  onViewAs: (roleId: string) => void;
+  onLogout: () => void;
+}) {
   const nav = useNavigate();
-  const caps = useCaps(session);
+  const caps = useCaps(effective);
+  const canViewAs = session.role === PRESENTATION_ROLE_ID;
   const [unread, setUnread] = useState(0);
   const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; message: string } | null>(null);
   useEffect(() => {
@@ -109,10 +123,26 @@ export function Layout({ session, onLogout }: { session: Session; onLogout: () =
         </nav>
         <div className="userbox">
           <ThemeToggle />
+          {canViewAs && (
+            <label className="view-as">
+              View as
+              <select
+                value={viewAs}
+                onChange={(e) => onViewAs(e.target.value)}
+                aria-label="Simulate access level"
+              >
+                {viewAsOptions().map((o) => (
+                  <option key={o.roleId} value={o.roleId}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="who">
             {session.fullName} ({session.userId})
             <br />
-            {session.roleName || session.role} · {toDisplayLocal(session.lastActivityUtc)}
+            {effective.roleName || effective.role} · {toDisplayLocal(session.lastActivityUtc)}
           </div>
           <button className="btn btn-sec" type="button" onClick={doLogout}>
             Log out
@@ -142,7 +172,7 @@ export function Layout({ session, onLogout }: { session: Session; onLogout: () =
           {flash.message}
         </div>
       )}
-      <main className="page">
+      <main className="page" key={effective.role}>
         <Outlet />
       </main>
       <footer className="footer no-print">

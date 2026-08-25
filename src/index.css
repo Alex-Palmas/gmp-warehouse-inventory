@@ -427,3 +427,19 @@ html[data-theme="dark"] .st-Released { color: #052e16; }
   justify-content: flex-end;
   padding: 12px 16px;
 }
+
+.view-as {
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  gap: 3px;
+  min-width: 170px;
+}
+.view-as select {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 5px 8px;
+}

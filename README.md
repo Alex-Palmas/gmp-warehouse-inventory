@@ -5,7 +5,7 @@ Standalone **system of record** for warehouse containers in a pharmaceutical / b
 
 This application is a technical control set that *can support* 21 CFR Part 11, 21 CFR 211 warehouse/records, EU GMP Annex 11, ALCOA+, and GAMP 5 **after** the site executes IQ/OQ/PQ, trains users, and adopts SOPs. It is **not** certified, validated, or fully compliant as shipped.
 
-Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.3`
+Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.4`
 
 ## Intended use
 
@@ -61,7 +61,7 @@ Demo accounts are seeded on first launch. **Passwords are documented here only. 
 | lab | Requester / Lab-Production | LabUser123!x |
 | super | Presentation Superuser | Super123!xx |
 
-`super` is a **presentation / walkthrough** account: every matrix capability, first-login password change skipped, and SoD (including own-receipt) waived for that role only. Do not use it for GMP.
+`super` is a **presentation / walkthrough** account: every matrix capability, first-login password change skipped, and SoD (including own-receipt) waived for that role only. A **View as** control in the header simulates any seeded access level (nav, workstrip, and page guards follow that role). Do not use it for GMP.
 
 Password storage: PBKDF2-SHA-256 (100000 iterations, 16-byte salt) via Web Crypto. Seeded hashes start as SHA-256(salt:password) and are upgraded to PBKDF2 on first successful login. Last 4 hashes retained. 90-day expiry. 5 failed attempts lock 15 minutes (or until admin unlock). Same error for unknown user vs bad password. First login must change the temp password (min 12 chars, upper+lower+digit+special). Production MUST change all demo passwords.
 
