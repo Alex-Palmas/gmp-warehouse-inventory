@@ -265,7 +265,7 @@ export default function App() {
           path="audit"
           element={
             <CapRoute session={session} cap="viewAudit">
-              <AuditTrail />
+              <AuditTrail session={session} />
             </CapRoute>
           }
         />

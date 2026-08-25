@@ -53,10 +53,15 @@ export function AccessControl({ session }: { session: Session }) {
   return (
     <div>
       <h1>User access control</h1>
-      <p className="help">
-        21 CFR 11.10(d)(g) / Annex 11 §12. Unique user IDs are never reused. Users are deactivated,
-        not deleted. The permission matrix is data — saving it requires an electronic signature.
-      </p>
+      <div className="card legend">
+        <strong>21 CFR Part 11 mapping</strong>
+        <ul>
+          <li>11.10(d) — access limited to authorized individuals (unique user IDs; deactivate not delete; lockout).</li>
+          <li>11.10(g) — authority checks per operation via the live capability matrix (not role display names).</li>
+          <li>11.10(e) — append-only audit trail of operator actions (UTC + local).</li>
+        </ul>
+        The matrix below is the editor. Unique user IDs are never reused. Saving the matrix requires an electronic signature.
+      </div>
       <div className="row" style={{ marginBottom: 8 }}>
         <button className={`btn ${tab === 'users' ? '' : 'btn-sec'}`} type="button" onClick={() => setTab('users')}>
           Users
@@ -109,6 +114,8 @@ function UsersPanel({
   const [form, setForm] = useState({ userId: '', fullName: '', role: 'operator', password: '' });
   const [reason, setReason] = useState('Administrative change');
   const [effective, setEffective] = useState('');
+  const canUnlock = useCap(session, 'unlockUser');
+  const canResetPw = useCap(session, 'resetUserPassword');
 
   async function reload() {
     setRows(await listUsers());
@@ -259,7 +266,7 @@ function UsersPanel({
                       <button className="btn btn-sec" type="button" onClick={() => void patch(u, { active: !u.active }, reason || (u.active ? 'Deactivate' : 'Activate'))}>
                         {u.active ? 'Deactivate' : 'Activate'}
                       </button>
-                      {locked && (
+                      {locked && canUnlock && (
                         <button
                           className="btn btn-sec"
                           type="button"
@@ -275,6 +282,7 @@ function UsersPanel({
                           Unlock
                         </button>
                       )}
+                      {canResetPw && (
                       <button
                         className="btn btn-sec"
                         type="button"
@@ -286,6 +294,7 @@ function UsersPanel({
                       >
                         Reset temp password
                       </button>
+                      )}
                       <button
                         className="btn btn-sec"
                         type="button"
@@ -347,6 +356,7 @@ function UsersPanel({
 }
 
 function MatrixPanel({ session, canEdit }: { session: Session; canEdit: boolean }) {
+  const canCreateRole = useCap(session, 'createRole');
   const [roles, setRoles] = useState<RoleRecord[]>([]);
   const [live, setLive] = useState<PermissionMatrixDocument | null>(null);
   const [rows, setRows] = useState<MatrixRows>({});
@@ -493,7 +503,7 @@ function MatrixPanel({ session, canEdit }: { session: Session; canEdit: boolean 
           </button>
         )}
       </div>
-      {canEdit && (
+      {canEdit && canCreateRole && (
         <div className="card">
           <h2>Custom role</h2>
           <form

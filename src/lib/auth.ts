@@ -9,7 +9,7 @@ import { getDb } from './db';
 import { hashPassword, randomSalt, verifyPasswordFlexible } from './crypto';
 import { nowUtcIso } from './dates';
 import { newId } from './ids';
-import { appendAudit } from './audit';
+import { appendAudit, appendAuditSystem } from './audit';
 import { assertCapability, assertMayAssignRole, getRole, hasCapability, resolveRoleId } from './permissions';
 import {
   assertPasswordPolicy,
@@ -100,8 +100,15 @@ function normalizeUser(raw: UserRecord): UserRecord {
 export async function login(userId: string, password: string): Promise<Session> {
   const db = await getDb();
   const raw = (await db.get('users', userId.trim())) as UserRecord | undefined;
-  const fail = async (uid: string, name: string, detail: string, event = 'LOGIN_FAIL') => {
+  const fail = async (uid: string, name: string, detail: string, event: 'LOGIN_FAIL' | 'LOCKOUT' = 'LOGIN_FAIL') => {
     await logAccess(uid, name, event, detail);
+    await appendAuditSystem(uid, name, {
+      action: event,
+      recordId: uid,
+      field: 'login',
+      newValue: event,
+      reasonForChange: detail,
+    });
     throw new Error(GENERIC_LOGIN_ERROR);
   };
   if (!raw || !raw.active) {
@@ -109,16 +116,31 @@ export async function login(userId: string, password: string): Promise<Session> 
   }
   const user = normalizeUser(raw as UserRecord);
   if (isAccountLocked(user)) {
-    await logAccess(user.userId, user.fullName, 'LOCKOUT', user.lockReason ?? 'Account locked');
-    throw new Error(GENERIC_LOGIN_ERROR);
+    await fail(user.userId, user.fullName, user.lockReason ?? 'Account locked', 'LOCKOUT');
   }
   const check = await verifyPasswordFlexible(password, user.salt, user.passwordHash, user.algorithm);
   if (!check.ok) {
     const { user: next, locked } = applyFailedLogin(user, Date.now());
     await db.put('users', next);
     await logAccess(user.userId, user.fullName, 'LOGIN_FAIL', 'Bad password');
+    await appendAuditSystem(user.userId, user.fullName, {
+      action: 'LOGIN_FAIL',
+      recordId: user.userId,
+      field: 'failedAttempts',
+      oldValue: String(user.failedAttempts ?? 0),
+      newValue: String(next.failedAttempts),
+      reasonForChange: 'Bad password',
+    });
     if (locked) {
       await logAccess(user.userId, user.fullName, 'LOCKOUT', next.lockReason ?? 'Too many failed login attempts');
+      await appendAuditSystem(user.userId, user.fullName, {
+        action: 'LOCKOUT',
+        recordId: user.userId,
+        field: 'lockedUntilUtc',
+        oldValue: '',
+        newValue: next.lockedUntilUtc ?? '',
+        reasonForChange: next.lockReason ?? 'Too many failed login attempts',
+      });
     }
     throw new Error(GENERIC_LOGIN_ERROR);
   }
@@ -234,7 +256,18 @@ export async function updateUser(
   },
   reason: string,
 ): Promise<UserRecord> {
-  await assertCapability(session, 'adminUsers', 'User administration capability required');
+  const resetting = Boolean(patch.newPassword);
+  const adminPatch =
+    patch.fullName !== undefined ||
+    patch.role !== undefined ||
+    patch.active !== undefined ||
+    patch.mustChangePassword !== undefined;
+  if (adminPatch || !resetting) {
+    await assertCapability(session, 'adminUsers', 'User administration capability required');
+  }
+  if (resetting) {
+    await assertCapability(session, 'resetUserPassword', 'Reset user password capability required');
+  }
   if (!reason.trim()) throw new Error('Reason for change is required');
   const db = await getDb();
   const rec = (await db.get('users', userId)) as UserRecord | undefined;
@@ -288,7 +321,7 @@ export async function updateUser(
     user.mustChangePassword = true;
     user.passwordChangedUtc = nowUtcIso();
     await appendAudit(session, {
-      action: 'USER_UPDATE',
+      action: 'PASSWORD_RESET',
       recordId: userId,
       field: 'passwordHash',
       oldValue: '(redacted)',
@@ -312,7 +345,7 @@ export async function updateUser(
 }
 
 export async function unlockUser(session: Session, userId: string, reason: string): Promise<UserRecord> {
-  await assertCapability(session, 'adminUsers', 'User administration capability required');
+  await assertCapability(session, 'unlockUser', 'Unlock user capability required');
   if (!reason.trim()) throw new Error('Reason for change is required');
   const db = await getDb();
   const rec = (await db.get('users', userId)) as UserRecord | undefined;

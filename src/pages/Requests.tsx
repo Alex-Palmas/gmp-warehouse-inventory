@@ -30,6 +30,9 @@ export function Requests({ session }: { session: Session }) {
   const caps = useCaps(session);
   const canSubmit = useCap(session, 'submitRequest');
   const canFulfill = useCap(session, 'fulfillRequest');
+  const canCancel = useCap(session, 'cancelRequest');
+  const canRejectReq = useCap(session, 'rejectRequest');
+  const canConfirmReceipt = useCap(session, 'confirmRequestReceipt');
   const [tab, setTab] = useState<'submit' | 'queue' | 'mine'>('queue');
   const [reqs, setReqs] = useState<MaterialRequest[]>([]);
   const [mats, setMats] = useState<Material[]>([]);
@@ -123,6 +126,7 @@ export function Requests({ session }: { session: Session }) {
           onReload={reload}
           onError={setErr}
           onMsg={setMsg}
+          canReject={Boolean(canRejectReq)}
         />
       )}
       {tab === 'mine' && (
@@ -133,6 +137,8 @@ export function Requests({ session }: { session: Session }) {
           onError={setErr}
           onMsg={setMsg}
           canFulfill={Boolean(caps?.has('fulfillRequest'))}
+          canCancel={Boolean(canCancel)}
+          canConfirmReceipt={Boolean(canConfirmReceipt)}
         />
       )}
     </div>
@@ -321,6 +327,7 @@ function Queue({
   onReload,
   onError,
   onMsg,
+  canReject,
 }: {
   session: Session;
   open: MaterialRequest[];
@@ -331,6 +338,7 @@ function Queue({
   onReload: () => Promise<void>;
   onError: (s: string) => void;
   onMsg: (s: string) => void;
+  canReject: boolean;
 }) {
   const [scanQty, setScanQty] = useState(1);
   const [override, setOverride] = useState('');
@@ -548,6 +556,8 @@ function Queue({
             >
               Confirm issue
             </button>
+            {canReject && (
+              <>
             <label>
               Warehouse reject reason
               <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
@@ -568,6 +578,8 @@ function Queue({
             >
               Reject request
             </button>
+              </>
+            )}
             <div className="pick-ticket">
               <h1>Pick ticket {active.requestId}</h1>
               <p>
@@ -615,6 +627,8 @@ function Mine({
   onReload,
   onError,
   onMsg,
+  canCancel,
+  canConfirmReceipt,
 }: {
   session: Session;
   mine: MaterialRequest[];
@@ -622,6 +636,8 @@ function Mine({
   onError: (s: string) => void;
   onMsg: (s: string) => void;
   canFulfill: boolean;
+  canCancel: boolean;
+  canConfirmReceipt: boolean;
 }) {
   const [cancelReason, setCancelReason] = useState('');
   return (
@@ -649,7 +665,7 @@ function Mine({
               </td>
               <td>{r.status}</td>
               <td>
-                {r.status === 'Submitted' && (
+                {r.status === 'Submitted' && canCancel && (
                   <button
                     className="btn btn-sec"
                     type="button"
@@ -666,7 +682,7 @@ function Mine({
                     Cancel
                   </button>
                 )}
-                {(r.status === 'Issued' || r.status === 'Partially Issued') && (
+                {(r.status === 'Issued' || r.status === 'Partially Issued') && canConfirmReceipt && (
                   <button
                     className="btn btn-ok"
                     type="button"

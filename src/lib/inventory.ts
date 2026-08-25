@@ -140,14 +140,25 @@ export async function reserveSerialsForRequest(
   }
 }
 
-export async function clearReservationsForRequest(requestId: string): Promise<number> {
+export async function clearReservationsForRequest(session: Session, requestId: string): Promise<number> {
   const all = await listInventory();
   let n = 0;
   for (const rec of all) {
     if (rec.reservedForRequestId !== requestId) continue;
+    const old = rec.reservedForRequestId;
     rec.reservedForRequestId = undefined;
     rec.reservedQty = 0;
+    rec.modifiedBy = session.userId;
+    rec.modifiedOnUtc = nowUtcIso();
     await putInventory(rec);
+    await appendAudit(session, {
+      action: 'REQUEST_RESERVE',
+      recordId: rec.serial,
+      field: 'reservedForRequestId',
+      oldValue: old,
+      newValue: '',
+      reasonForChange: `Clear reservation for ${requestId}`,
+    });
     n++;
   }
   return n;

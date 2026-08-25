@@ -1,6 +1,6 @@
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 export const DOC_ID = 'DOC-WH-INV-001';
-export const DOC_VERSION = '1.2';
+export const DOC_VERSION = '1.3';
 export const VALIDATION_BANNER =
   'Not validated — do not use for GMP decisions until IQ/OQ/PQ approved.';
 export const SESSION_IDLE_MS = 15 * 60 * 1000;
@@ -37,6 +37,15 @@ export const CAPABILITIES = [
   'fulfillRequest',
   'samplePull',
   'viewInbox',
+  'approveMaterial',
+  'rejectMaterial',
+  'cancelRequest',
+  'rejectRequest',
+  'confirmRequestReceipt',
+  'unlockUser',
+  'resetUserPassword',
+  'createRole',
+  'exportAudit',
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -44,7 +53,7 @@ export const CAPABILITY_GROUPS: { id: string; label: string; caps: Capability[] 
   {
     id: 'view',
     label: 'View',
-    caps: ['viewDashboard', 'viewRegister', 'viewAudit', 'viewAccessLog', 'scanLookup', 'viewInbox'],
+    caps: ['viewDashboard', 'viewRegister', 'viewAudit', 'viewAccessLog', 'scanLookup', 'viewInbox', 'exportAudit'],
   },
   {
     id: 'inventory',
@@ -54,7 +63,17 @@ export const CAPABILITY_GROUPS: { id: string; label: string; caps: Capability[] 
   {
     id: 'requests',
     label: 'Requests & sampling',
-    caps: ['submitMaterial', 'submitRequest', 'fulfillRequest', 'samplePull'],
+    caps: [
+      'submitMaterial',
+      'approveMaterial',
+      'rejectMaterial',
+      'submitRequest',
+      'cancelRequest',
+      'rejectRequest',
+      'confirmRequestReceipt',
+      'fulfillRequest',
+      'samplePull',
+    ],
   },
   {
     id: 'qa',
@@ -64,7 +83,16 @@ export const CAPABILITY_GROUPS: { id: string; label: string; caps: Capability[] 
   {
     id: 'admin',
     label: 'Admin',
-    caps: ['adminMaterials', 'adminUsers', 'editPermissionMatrix', 'backupRestore', 'exportReports'],
+    caps: [
+      'adminMaterials',
+      'adminUsers',
+      'unlockUser',
+      'resetUserPassword',
+      'editPermissionMatrix',
+      'createRole',
+      'backupRestore',
+      'exportReports',
+    ],
   },
 ];
 
@@ -94,6 +122,15 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   fulfillRequest: 'Pick / fulfill requests',
   samplePull: 'Pull sample / retain',
   viewInbox: 'View inbox',
+  approveMaterial: 'Approve material submission',
+  rejectMaterial: 'Reject material submission',
+  cancelRequest: 'Cancel material request',
+  rejectRequest: 'Reject material request',
+  confirmRequestReceipt: 'Confirm request receipt',
+  unlockUser: 'Unlock user accounts',
+  resetUserPassword: 'Reset user password',
+  createRole: 'Create custom role',
+  exportAudit: 'Export audit trail',
 };
 
 /** Stable role IDs. Display names live on RoleRecord.name. */
@@ -446,7 +483,13 @@ export type AuditAction =
   | 'REQUEST_REJECT'
   | 'REQUEST_CLOSE'
   | 'REQUEST_RESERVE'
-  | 'SAMPLE_PULL';
+  | 'SAMPLE_PULL'
+  | 'SCAN'
+  | 'LOGIN_FAIL'
+  | 'LOCKOUT'
+  | 'EXPORT'
+  | 'PASSWORD_RESET'
+  | 'REQUEST_UNPICK';
 
 export interface PickedLine {
   serial: string;

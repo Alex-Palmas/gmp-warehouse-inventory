@@ -217,10 +217,19 @@ export async function removePick(
   if (!['Submitted', 'Picking'].includes(req.status)) {
     throw new Error('Cannot unpick after issue confirmation');
   }
+  const oldQty = req.pickedSerials.find((p) => p.serial === serial)?.qty ?? 0;
   req.pickedSerials = req.pickedSerials.filter((p) => p.serial !== serial);
   if (!req.pickedSerials.length) req.status = 'Submitted';
   const db = await getDb();
   await db.put('materialRequests', req);
+  await appendAudit(session, {
+    action: 'REQUEST_UNPICK',
+    recordId: requestId,
+    field: 'pickedSerials',
+    oldValue: `${serial}:${oldQty}`,
+    newValue: '',
+    reasonForChange: `Removed pick ${serial} from ${requestId}`,
+  });
   return req;
 }
 
@@ -262,7 +271,7 @@ export async function confirmFulfillment(
   req.fulfilledOnUtc = nowUtcIso();
   req.status = req.qtyIssued + 1e-9 >= req.qtyRequested ? 'Issued' : 'Partially Issued';
   if (req.status === 'Issued') {
-    await clearReservationsForRequest(req.requestId);
+    await clearReservationsForRequest(session, req.requestId);
     req.reservedSerials = [];
   }
   const db = await getDb();
@@ -286,7 +295,7 @@ export async function confirmFulfillment(
 }
 
 export async function confirmReceived(session: Session, requestId: string): Promise<MaterialRequest> {
-  await assertCapability(session, 'submitRequest', 'Role cannot confirm request receipt');
+  await assertCapability(session, 'confirmRequestReceipt', 'Role cannot confirm request receipt');
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
   if (req.status !== 'Issued' && req.status !== 'Partially Issued') {
@@ -313,7 +322,7 @@ export async function confirmReceived(session: Session, requestId: string): Prom
 }
 
 export async function cancelRequest(session: Session, requestId: string, reason: string): Promise<MaterialRequest> {
-  await assertCapability(session, 'submitRequest', 'Role cannot cancel requests');
+  await assertCapability(session, 'cancelRequest', 'Role cannot cancel requests');
   if (!reason.trim()) throw new Error('Cancel reason is required');
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
@@ -323,7 +332,7 @@ export async function cancelRequest(session: Session, requestId: string, reason:
   }
   req.status = 'Cancelled';
   req.rejectReason = reason.trim();
-  await clearReservationsForRequest(requestId);
+  await clearReservationsForRequest(session, requestId);
   req.reservedSerials = [];
   const db = await getDb();
   await db.put('materialRequests', req);
@@ -347,7 +356,7 @@ export async function cancelRequest(session: Session, requestId: string, reason:
 }
 
 export async function rejectRequest(session: Session, requestId: string, reason: string): Promise<MaterialRequest> {
-  await assertCapability(session, 'fulfillRequest', 'Role cannot reject requests');
+  await assertCapability(session, 'rejectRequest', 'Role cannot reject requests');
   if (!reason.trim()) throw new Error('Reject reason is required');
   const req = await getRequest(requestId);
   if (!req) throw new Error('Request not found');
@@ -358,7 +367,7 @@ export async function rejectRequest(session: Session, requestId: string, reason:
   req.status = 'Rejected';
   req.rejectReason = reason.trim();
   req.fulfilledBy = session.userId;
-  await clearReservationsForRequest(requestId);
+  await clearReservationsForRequest(session, requestId);
   req.reservedSerials = [];
   const db = await getDb();
   await db.put('materialRequests', req);

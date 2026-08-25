@@ -4,7 +4,7 @@ import { appendAudit } from './audit';
 import { nowUtcIso } from './dates';
 import { notifyCapability, notifyUser } from './inbox';
 import { saveMaterial } from './materials';
-import { assertCapability, hasCapability } from './permissions';
+import { assertCapability } from './permissions';
 import { formatSubmissionId } from './serial';
 import type { SerialCounter } from '../types';
 
@@ -82,7 +82,7 @@ export async function submitMaterial(session: Session, input: SubmitMaterialInpu
     reasonForChange: rec.justification,
   });
   await notifyCapability(
-    'adminMaterials',
+    'approveMaterial',
     `Material submission ${submissionId}`,
     `${session.fullName} proposed ${rec.materialName} (${code || 'code TBD'}).`,
     'request_submitted',
@@ -98,9 +98,7 @@ export async function approveMaterialSubmission(
   assignedCode: string,
   reason: string,
 ): Promise<{ submission: MaterialSubmission; material: Material }> {
-  const canQa = await hasCapability(session, 'qaDisposition');
-  const canSup = session.role === 'supervisor' || (await hasCapability(session, 'adminMaterials'));
-  if (!canQa && !canSup) throw new Error('Only QA or a supervisor may approve material submissions');
+  await assertCapability(session, 'approveMaterial', 'Approve material capability required');
   const rec = await getSubmission(submissionId);
   if (!rec) throw new Error('Submission not found');
   if (rec.status !== 'Submitted') throw new Error(`Cannot approve a ${rec.status} submission`);
@@ -152,9 +150,7 @@ export async function rejectMaterialSubmission(
   submissionId: string,
   reason: string,
 ): Promise<MaterialSubmission> {
-  const canQa = await hasCapability(session, 'qaDisposition');
-  const canSup = session.role === 'supervisor' || (await hasCapability(session, 'adminMaterials'));
-  if (!canQa && !canSup) throw new Error('Only QA or a supervisor may reject material submissions');
+  await assertCapability(session, 'rejectMaterial', 'Reject material capability required');
   if (!reason.trim()) throw new Error('Reject reason is required');
   const rec = await getSubmission(submissionId);
   if (!rec) throw new Error('Submission not found');

@@ -9,14 +9,14 @@ import {
   rejectMaterialSubmission,
   submitMaterial,
 } from '../lib/submissions';
-import { hasCapability } from '../lib/permissions';
 
 export function SubmitMaterial({ session }: { session: Session }) {
   const allowed = useCap(session, 'submitMaterial');
+  const canApprove = useCap(session, 'approveMaterial');
+  const canReject = useCap(session, 'rejectMaterial');
   const [rows, setRows] = useState<MaterialSubmission[]>([]);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
-  const [canReview, setCanReview] = useState(false);
   const [form, setForm] = useState({
     materialCode: '',
     materialName: '',
@@ -35,9 +35,6 @@ export function SubmitMaterial({ session }: { session: Session }) {
 
   useEffect(() => {
     void listSubmissions().then(setRows);
-    void Promise.all([hasCapability(session, 'qaDisposition'), hasCapability(session, 'adminMaterials')]).then(
-      ([a, b]) => setCanReview(a || b || session.role === 'supervisor'),
-    );
   }, [session]);
 
   if (allowed === null) return <CapChecking />;
@@ -164,7 +161,7 @@ export function SubmitMaterial({ session }: { session: Session }) {
               <td>{s.status}</td>
               <td>{s.submittedBy}</td>
               <td>
-                {canReview && s.status === 'Submitted' && (
+                {(canApprove || canReject) && s.status === 'Submitted' && (
                   <div className="row">
                     <input
                       placeholder="Code"
@@ -176,7 +173,7 @@ export function SubmitMaterial({ session }: { session: Session }) {
                       value={reasonById[s.submissionId] ?? ''}
                       onChange={(e) => setReasonById({ ...reasonById, [s.submissionId]: e.target.value })}
                     />
-                    <button
+                    {canApprove && <button
                       className="btn btn-ok"
                       type="button"
                       onClick={() =>
@@ -194,8 +191,8 @@ export function SubmitMaterial({ session }: { session: Session }) {
                       }
                     >
                       Approve
-                    </button>
-                    <button
+                    </button>}
+                    {canReject && <button
                       className="btn btn-danger"
                       type="button"
                       onClick={() =>
@@ -208,7 +205,7 @@ export function SubmitMaterial({ session }: { session: Session }) {
                       }
                     >
                       Reject
-                    </button>
+                    </button>}
                   </div>
                 )}
                 {s.status === 'Rejected' && <div className="help">{s.rejectReason}</div>}

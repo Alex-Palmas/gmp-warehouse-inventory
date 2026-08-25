@@ -3,12 +3,12 @@
 | Field | Value |
 |-------|-------|
 | Document | OQ-WH-INV-001 |
-| Version | 1.2 (draft template) |
+| Version | 1.3 (draft template) |
 | Site | [SITE] |
 | Owner | [OWNER] |
 | Date | [DATE] |
 | Status | **Not approved / not executed** |
-| Software | DOC-WH-INV-001 v1.2 |
+| Software | DOC-WH-INV-001 v1.3 |
 
 Automated unit tests (`vitest`) cover serial format, workflow permissions, audit API immutability, and FEFO logic. They **do not** replace this OQ. Record unit-test log attachment: _______________
 
@@ -166,7 +166,7 @@ Confirm quarantine count includes S2; expired list includes 000007; 30/90 day li
 
 ### OQ-15 Document control banner (URS-18)
 
-Every page shows validation banner and footer DOC-WH-INV-001 v1.2. **Pass/Fail:** ___
+Every page shows validation banner and footer DOC-WH-INV-001 v1.3. **Pass/Fail:** ___
 
 ---
 
@@ -282,3 +282,39 @@ OQ is [ ] Passed  [ ] Passed with deviations  [ ] Failed
 ### OQ-25 Submit material
 
 **Steps:** As `lab`, submit a new material. As `qa`, approve with a code. Material appears on Material Master and in Receive dropdown. Inbox notified. **Pass/Fail:** ___
+
+---
+
+### OQ-26 Matrix deny of a split capability (11.10(g))
+
+**Steps**
+1. As `wh` (operator), open Submit material. Confirm **Approve** is hidden (no `approveMaterial`). Attempting `approveMaterialSubmission` is denied.
+2. As `qa`, Approve is visible and succeeds (writes Material Master). Audit MATERIAL_APPROVE.
+3. As `sysadmin`, Access → matrix: operator `qaDisposition` is unchecked. Checking `qaDisposition` **and** `fulfillRequest` on QA (or operator) with SoD ON and no waiver → save blocked.
+4. Uncheck `editPermissionMatrix` on all roles → save blocked (lockout prevention).
+
+**Expected:** Per-action caps enforced; SoD fulfillRequest XOR qaDisposition; lockout prevention. **Pass/Fail:** ___
+
+---
+
+### OQ-27 Audit trail on goods receipt (11.10(e))
+
+**Steps**
+1. As `wh`, receive 2 containers. Note serials S1, S2.
+2. Open Audit (`#/audit`). Newest first. Filter record = S1 (query param `record=`). Confirm RECEIVE row: UTC + local, userId=`wh`, old blank, new Quarantine, reason includes receipt batch.
+3. Confirm no edit/delete controls. Export CSV (if `exportAudit` / `exportReports`). Open record detail for S1 — same audit rows via `listAuditForRecord`.
+
+**Expected:** Contemporaneous append-only row per serial. **Pass/Fail:** ___
+
+---
+
+### OQ-28 Audit trail on material request (11.10(e))
+
+**Steps**
+1. As `lab`, submit a request. Note MR- id. Audit contains REQUEST_SUBMIT.
+2. As `wh`, pick and confirm issue. Audit contains REQUEST_PICK and REQUEST_ISSUE (request id and/or serial).
+3. As `lab`, confirm received. Audit REQUEST_CLOSE. Cancel a different Submitted request with reason — REQUEST_CANCEL with reason required.
+4. Filter Audit action=`REQUEST_SUBMIT` and date from/to. Deep-link URL retains filters.
+
+**Expected:** Request lifecycle fully trailed; reason on cancel/reject. **Pass/Fail:** ___
+

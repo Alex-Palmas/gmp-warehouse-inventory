@@ -108,6 +108,11 @@ export function defaultMatrixRows(): MatrixRows {
       'backupRestore',
       'submitMaterial',
       'submitRequest',
+      'confirmRequestReceipt',
+      'unlockUser',
+      'resetUserPassword',
+      'createRole',
+      'exportAudit',
     ]),
     supervisor: allowCaps([
       'viewDashboard',
@@ -130,6 +135,14 @@ export function defaultMatrixRows(): MatrixRows {
       'submitMaterial',
       'submitRequest',
       'fulfillRequest',
+      'approveMaterial',
+      'rejectMaterial',
+      'cancelRequest',
+      'rejectRequest',
+      'confirmRequestReceipt',
+      'unlockUser',
+      'resetUserPassword',
+      'exportAudit',
     ]),
     operator: allowCaps([
       'viewDashboard',
@@ -145,6 +158,8 @@ export function defaultMatrixRows(): MatrixRows {
       'submitMaterial',
       'submitRequest',
       'fulfillRequest',
+      'rejectRequest',
+      'confirmRequestReceipt',
     ]),
     qa: allowCaps([
       'viewDashboard',
@@ -164,6 +179,10 @@ export function defaultMatrixRows(): MatrixRows {
       'submitMaterial',
       'submitRequest',
       'samplePull',
+      'approveMaterial',
+      'rejectMaterial',
+      'confirmRequestReceipt',
+      'exportAudit',
     ]),
     qc: allowCaps([
       'viewDashboard',
@@ -175,8 +194,9 @@ export function defaultMatrixRows(): MatrixRows {
       'submitMaterial',
       'submitRequest',
       'samplePull',
+      'confirmRequestReceipt',
     ]),
-    readonly: allowCaps(['viewDashboard', 'viewRegister', 'scanLookup', 'viewAudit', 'viewInbox']),
+    readonly: allowCaps(['viewDashboard', 'viewRegister', 'scanLookup', 'viewAudit', 'viewInbox', 'exportAudit']),
     requester: allowCaps([
       'viewDashboard',
       'viewRegister',
@@ -184,6 +204,8 @@ export function defaultMatrixRows(): MatrixRows {
       'viewInbox',
       'submitMaterial',
       'submitRequest',
+      'cancelRequest',
+      'confirmRequestReceipt',
     ]),
   };
 }
@@ -198,7 +220,7 @@ export function buildDefaultMatrixDocument(): PermissionMatrixDocument {
     modifiedOnUtc: utc,
     approvedBy: 'system',
     approvedOnUtc: utc,
-    reasonForChange: 'Seeded default matrix (DOC-WH-INV-001 v1.2)',
+    reasonForChange: 'Seeded default matrix (DOC-WH-INV-001 v1.3)',
     meaningOfSignature: 'System seed',
   };
 }
@@ -480,7 +502,7 @@ export async function createCustomRole(
   session: Session,
   input: { roleId: string; name: string; description: string },
 ): Promise<RoleRecord> {
-  await assertCapability(session, 'editPermissionMatrix', 'Only matrix editors may create roles');
+  await assertCapability(session, 'createRole', 'Only roles with createRole may create roles');
   const roleId = input.roleId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
   if (!roleId) throw new Error('Role ID is required (letters, digits, _ -)');
   if ((SYSTEM_ROLE_IDS as readonly string[]).includes(roleId)) {

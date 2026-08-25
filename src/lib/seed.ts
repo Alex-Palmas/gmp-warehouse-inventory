@@ -1,3 +1,9 @@
+/**
+ * First-boot seed and IndexedDB migrations. These writes are system seed, not
+ * user GMP transactions, and do not call appendAudit (21 CFR 11.10(e)
+ * contemporaneous trail starts after seed). hydrateMatrixDocument fills newly
+ * added capabilities from defaults for existing databases.
+ */
 import type { InventoryRecord, Material, UserRecord } from '../types';
 import { getDb } from './db';
 import { hashPasswordSha256Salt } from './crypto';

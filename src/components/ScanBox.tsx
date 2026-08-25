@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { parseScanPayload } from '../lib/serial';
 import { isLocationCode } from '../lib/locations';
 import { scanErr, scanOk } from '../lib/scanFeedback';
+import { appendAudit } from '../lib/audit';
+import { loadSession } from '../lib/auth';
 
 export const SCAN_EVENT = 'gmp-wh-scan';
 
@@ -25,6 +27,18 @@ export function ScanBox() {
     window.dispatchEvent(
       new CustomEvent(SCAN_EVENT, { detail: { serial: s, locationCode: isLocationCode(s) ? s : undefined } }),
     );
+    if (!isLocationCode(s)) {
+      const session = loadSession();
+      if (session) {
+        void appendAudit(session, {
+          action: 'SCAN',
+          recordId: s,
+          field: 'scan',
+          newValue: s,
+          reasonForChange: 'Barcode scan',
+        });
+      }
+    }
     if (!onPick && !onTransfer) {
       if (isLocationCode(s)) {
         scanOk(s);

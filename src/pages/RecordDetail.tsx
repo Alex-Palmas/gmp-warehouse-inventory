@@ -78,6 +78,7 @@ export function RecordDetail() {
             <th>Old</th>
             <th>New</th>
             <th>Reason</th>
+            <th>Meaning of signature</th>
           </tr>
         </thead>
         <tbody>
@@ -93,6 +94,7 @@ export function RecordDetail() {
               <td>{a.oldValue}</td>
               <td>{a.newValue}</td>
               <td>{a.reasonForChange}</td>
+              <td>{a.meaningOfSignature}</td>
             </tr>
           ))}
         </tbody>

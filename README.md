@@ -1,17 +1,17 @@
-# GMP Warehouse Inventory (DOC-WH-INV-001 v1.2)
+# GMP Warehouse Inventory (DOC-WH-INV-001 v1.3)
 Standalone **system of record** for warehouse containers in a pharmaceutical / biotech facility, plus Excel reports and a CSV documentation pack.
 
 **VALIDATION STATUS: Not validated — do not use for GMP decisions until IQ/OQ/PQ approved.**
 
 This application is a technical control set that *can support* 21 CFR Part 11, 21 CFR 211 warehouse/records, EU GMP Annex 11, ALCOA+, and GAMP 5 **after** the site executes IQ/OQ/PQ, trains users, and adopts SOPs. It is **not** certified, validated, or fully compliant as shipped.
 
-Document number: `DOC-WH-INV-001` · Version: `1.2` · App version: `1.2.0`
+Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.0`
 
 ## Intended use
 
 Local (single-node, browser) inventory register for **per-container** serials (`WH-YYYY-NNNNNN`), receipt batches (`RCV-YYYY-NNNNNN`), goods receipt into Quarantine, QA e-signed lot-release of sibling containers, sampling, material submissions, material requests (`MR-YYYY-NNNNNN`) with FEFO auto-reserve → scan pick → issue, location barcodes, append-only audit trail, JSON backup/restore, and Excel reports (reports are not the system of record).
 
-See `docs/10-Intended-Use-Known-Limitations.md`, `docs/11-Access-Control-Matrix.md`, and `docs/12-Material-Request-and-Serialization.md`.
+See `docs/10-Intended-Use-Known-Limitations.md`, `docs/11-Access-Control-Matrix.md`, `docs/12-Material-Request-and-Serialization.md`, and `docs/13-Part11-Access-and-Audit.md`.
 
 ## How to run
 
@@ -61,7 +61,7 @@ Password storage: PBKDF2-SHA-256 (100000 iterations, 16-byte salt) via Web Crypt
 
 Idle session timeout is 15 minutes. Re-authentication is required for QA e-signatures (password re-entry; printed name, user ID, datetime, meaning of signature captured).
 
-## Typical flow (OQ-style) — v1.2
+## Typical flow (OQ-style) — v1.3
 
 1. Log in as `lab` (temp password `LabUser123!x`, 12-char policy). Change password. **Submit material** if the item is not on the master; QA/supervisor approves → Material Master. **Request material**: typeahead, qty, needed-by, Enter. FEFO Released stock is auto-reserved.
 2. Log in as `wh`. Change temp password. **Receive**: N containers × qty per container (e.g. 24 vials × 10 mL) → N unique serials, one `receiptBatchId`, all Quarantine. Duplicate last receipt copies material/supplier/location. Print all N labels (Code 128 of serial; QR `serial|lot|expiry|status|containerType`).
@@ -91,7 +91,7 @@ Companion workbook: `exports/GMP_Warehouse_Inventory_Register_v1.1.xlsx`
 
 ## Residual Part 11 / Annex 11 / IT gaps (honest)
 
-This is a single-node local/browser application. It does **not** provide:
+This is a single-node local/browser application. v1.3 split per-action capabilities and writes LOGIN_FAIL/LOCKOUT/SCAN/export into the append-only audit trail. It still does **not** provide:
 
 | Gap | Why it matters |
 |-----|----------------|
@@ -123,6 +123,7 @@ Templates with `[SITE]`, `[OWNER]`, `[DATE]` placeholders — **not pre-approved
 10. Intended use / known limitations
 11. Access control matrix (default roles, SoD, 21 CFR 11.10(d)(g))
 12. Material request and serialization (per-container serials, request→pick→issue)
+13. Part 11 access and audit mapping (11.10(d)(e)(g), 11.50, 11.70)
 
 ## Default roles (seeded, system=true)
 
@@ -147,6 +148,6 @@ Vite + React + TypeScript SPA, HashRouter, IndexedDB (idb), ExcelJS, JsBarcode, 
 Dates stored as ISO UTC; UI displays America/Los_Angeles.
 
 
-## Later (not in v1.2)
+## Later (not in v1.3)
 
 Deferred: kitting / BOM issue, ASN / CSV inbound import, temperature excursion logs.

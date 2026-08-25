@@ -2,7 +2,7 @@ import type { Material, Session } from '../types';
 import { getDb } from './db';
 import { appendAudit } from './audit';
 import { nowUtcIso } from './dates';
-import { assertCapability } from './permissions';
+import { hasCapability } from './permissions';
 
 export async function listMaterials(): Promise<Material[]> {
   const db = await getDb();
@@ -22,7 +22,11 @@ export async function saveMaterial(
   isNew: boolean,
   reason: string,
 ): Promise<Material> {
-  await assertCapability(session, 'adminMaterials', 'Material master capability required');
+  const viaMaster = await hasCapability(session, 'adminMaterials');
+  const viaApprove = isNew && (await hasCapability(session, 'approveMaterial'));
+  if (!viaMaster && !viaApprove) {
+    throw new Error('Material master capability required');
+  }
   if (!rec.materialCode.trim() || !rec.materialName.trim()) throw new Error('Code and name required');
   const db = await getDb();
   rec.modifiedBy = session.userId;

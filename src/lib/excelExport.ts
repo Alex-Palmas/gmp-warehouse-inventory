@@ -10,7 +10,7 @@ import {
 } from '../types';
 import { listInventory, listMovements } from './inventory';
 import { listMaterials } from './materials';
-import { listAudit } from './audit';
+import { appendAudit, listAudit } from './audit';
 import { isAccountLocked, listAccessLog, listUsers } from './auth';
 import { nowUtcIso, toDisplayLocal, locationToString } from './dates';
 import { assertCapability, getLiveMatrix, listRoles } from './permissions';
@@ -333,6 +333,13 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
   footer(ws8, session.userId, users.length + 1);
 
   const buf = await wb.xlsx.writeBuffer();
+  await appendAudit(session, {
+    action: 'EXPORT',
+    recordId: 'REPORTS',
+    field: 'workbook',
+    newValue: 'xlsx',
+    reasonForChange: 'Excel reports exported',
+  });
   return new Blob([buf], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
