@@ -20,7 +20,9 @@ html[data-theme="light"] {
   --warn: #c2410c;
   --warn-soft: #ffedd5;
   --hold: #7c3aed;
+  --hold-soft: #ede9fe;
   --q: #b45309;
+  --q-soft: #fef3c7;
   --banner: #fff7ed;
   --banner-ink: #9a3412;
   --banner-line: #fdba74;
@@ -59,7 +61,9 @@ html[data-theme="dark"] {
   --warn: #fb923c;
   --warn-soft: #7c2d12;
   --hold: #c4b5fd;
+  --hold-soft: #4c1d95;
   --q: #fbbf24;
+  --q-soft: #78350f;
   --banner: #3b2714;
   --banner-ink: #fed7aa;
   --banner-line: #9a3412;
@@ -274,14 +278,12 @@ a.kpi-link:hover, a.kpi-link:focus {
   flex: 1;
   font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
 }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; }
-.st-Quarantine { background: var(--q); color: #1a1200; }
-html[data-theme="dark"] .st-Quarantine { color: #1a1200; }
-.st-Released { background: var(--ok); color: #052e16; }
-html[data-theme="dark"] .st-Released { color: #052e16; }
-.st-Rejected, .st-Destroyed { background: var(--danger); color: #fff; }
-.st-Restricted, .st-Hold { background: var(--hold); color: #1e1b4b; }
-.st-Issued, .st-Consumed { background: #64748b; color: #fff; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.st-Quarantine { background: var(--q-soft); color: var(--q); }
+.st-Released { background: var(--ok-soft); color: var(--ok); }
+.st-Rejected, .st-Destroyed { background: var(--danger-soft); color: var(--danger); }
+.st-Restricted, .st-Hold { background: var(--hold-soft); color: var(--hold); }
+.st-Issued, .st-Consumed { background: var(--surface-2); color: var(--muted); }
 .modal-bg {
   position: fixed; inset: 0; background: rgba(0,0,0,.55);
   display: flex; align-items: center; justify-content: center; z-index: 50;
@@ -351,8 +353,8 @@ html[data-theme="dark"] .st-Released { color: #052e16; }
   pointer-events: none;
   box-shadow: var(--shadow);
 }
-.scan-flash-ok { background: var(--ok); color: #052e16; }
-.scan-flash-err { background: var(--danger); color: #fff; }
+.scan-flash-ok { background: var(--ok-soft); color: var(--ok); }
+.scan-flash-err { background: var(--danger-soft); color: var(--danger); }
 .badge-reserved { background: var(--accent); color: #fff; display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 .pick-ticket { display: none; }
 .kbd-hint { font-size: 11px; color: var(--muted); }
