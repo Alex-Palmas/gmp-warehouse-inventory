@@ -28,7 +28,8 @@ import {
   type ReceiveInput,
 } from './inventory';
 import { runIqCases, runOqPqExtra } from './oqExtra';
-import { captureBarcode, captureRecordProof, takeImages, type OqImage } from './oqProof';
+import { runExhaustive } from './oqExhaustive';
+import { captureBarcode, captureCaseProof, captureRecordProof, takeImages, type OqImage } from './oqProof';
 import {
   assertCapability,
   assertNotOwnReceipt,
@@ -148,51 +149,65 @@ export async function oq(
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   try {
     const { actual, pass, images } = await fn();
+    const verdict: OqVerdict = pass ? 'Pass' : 'Fail';
+    const fromCase = images ?? [];
+    const card = await captureCaseProof({ id, title, expected, actual, verdict });
+    const merged = takeImages(...fromCase, card);
     const row: OqResult = {
       id,
       urs,
       title,
       expected,
       actual,
-      verdict: pass ? 'Pass' : 'Fail',
+      verdict,
       ms: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0),
-      images: images ?? [],
+      images: merged,
     };
     results.push(row);
     onResult?.(row);
   } catch (e) {
+    const actual = e instanceof Error ? e.message : String(e);
+    const verdict: OqVerdict = 'Fail';
+    const fromCase: OqImage[] = [];
+    const card = await captureCaseProof({ id, title, expected, actual, verdict });
+    const merged = takeImages(...fromCase, card);
     const row: OqResult = {
       id,
       urs,
       title,
       expected,
-      actual: e instanceof Error ? e.message : String(e),
-      verdict: 'Fail',
+      actual,
+      verdict,
       ms: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0),
-      images: [],
+      images: merged,
     };
     results.push(row);
     onResult?.(row);
   }
 }
 
-function oqManual(
+async function oqManual(
   results: OqResult[],
   id: string,
   urs: string,
   title: string,
   expected: string,
   onResult?: (r: OqResult) => void,
-): void {
+): Promise<void> {
+  const actual = 'Not automated (visual / hardware)';
+  const verdict: OqVerdict = 'Manual';
+  const fromCase: OqImage[] = [];
+  const card = await captureCaseProof({ id, title, expected, actual, verdict });
+  const merged = takeImages(...fromCase, card);
   const row: OqResult = {
     id,
     urs,
     title,
     expected,
-    actual: 'Not automated (visual / hardware)',
-    verdict: 'Manual',
+    actual,
+    verdict,
     ms: 0,
-    images: [],
+    images: merged,
   };
   results.push(row);
   onResult?.(row);
@@ -275,7 +290,7 @@ async function runProtocol(onResult?: (r: OqResult) => void): Promise<OqResult[]
     },
     onResult,
   );
-  oqManual(
+  await oqManual(
     results,
     'OQ-02-PRINT',
     'URS-14',
@@ -759,6 +774,23 @@ async function runProtocol(onResult?: (r: OqResult) => void): Promise<OqResult[]
   );
 
   await runOqPqExtra({
+    results,
+    onResult,
+    oq,
+    threw,
+    esign,
+    receiveInput,
+    op,
+    qa,
+    lab,
+    sup,
+    val,
+    s1,
+    s2,
+    mtfId,
+  });
+
+  await runExhaustive({
     results,
     onResult,
     oq,

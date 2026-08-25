@@ -1,7 +1,7 @@
 {
   "name": "gmp-warehouse-inventory",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.3",
   "type": "module",
   "description": "GMP warehouse inventory system of record (not validated as shipped)",
   "scripts": {

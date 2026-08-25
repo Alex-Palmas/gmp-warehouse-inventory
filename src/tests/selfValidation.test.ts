@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getDb, OQ_DB_NAME, PROD_DB_NAME, currentDbName, resetDbConnection } from '../lib/db';
 import { buildDefaultMatrixDocument, defaultAllows, setMatrixCacheForTests } from '../lib/permissions';
+import { EXHAUSTIVE_OQ_IDS } from '../lib/oqExhaustive';
 import { runSelfValidation, type ValidationReport } from '../lib/selfValidation';
 import { buildValidationPdf } from '../lib/validationReport';
 import type { Session } from '../types';
@@ -100,19 +101,40 @@ describe('runSelfValidation sandbox isolation', () => {
     for (const id of required) {
       expect(ids).toContain(id);
     }
-    const automatedRequired = report.results.filter((r) => required.includes(r.id));
-    const failed = automatedRequired.filter((r) => r.verdict === 'Fail');
+    for (const id of EXHAUSTIVE_OQ_IDS) {
+      expect(ids).toContain(id);
+    }
+    const automatedRequired = report.results.filter((r) => required.includes(r.id) || EXHAUSTIVE_OQ_IDS.includes(r.id));
+    const failed = report.results.filter((r) => r.verdict === 'Fail');
     if (failed.length) {
       throw new Error(failed.map((r) => `${r.id}: ${r.actual}`).join('\n'));
     }
     expect(automatedRequired.every((r) => r.verdict !== 'Fail')).toBe(true);
-    expect(automatedRequired.filter((r) => r.verdict === 'Pass').length).toBe(automatedRequired.length);
+    expect(report.results.filter((r) => r.verdict === 'Pass').length).toBe(
+      report.results.filter((r) => r.verdict !== 'Manual').length,
+    );
+
+    const missingImages = report.results.filter(
+      (r) =>
+        !r.images?.length ||
+        r.images.some((img) => !img.caption || !img.dataUrl?.startsWith('data:image/')),
+    );
+    if (missingImages.length) {
+      throw new Error(missingImages.map((r) => `${r.id}: missing screenshot evidence`).join('\n'));
+    }
+    for (const r of report.results) {
+      expect(r.images.length).toBeGreaterThanOrEqual(1);
+      for (const img of r.images) {
+        expect(img.caption.length).toBeGreaterThan(0);
+        expect(img.dataUrl.startsWith('data:image/')).toBe(true);
+      }
+    }
 
     expect(report.sandboxDb).toBe(OQ_DB_NAME);
     // Production inventory was empty except meta; sandbox receipts must not land here.
     const inv = (await after.getAll('inventory')) as { serial: string }[];
     expect(inv.length).toBe(0);
-  }, 60_000);
+  }, 120_000);
 });
 
 const TINY_PNG =

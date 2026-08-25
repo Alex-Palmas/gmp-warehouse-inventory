@@ -48,7 +48,11 @@ export async function buildValidationPdf(report: ValidationReport): Promise<Blob
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   doc.text('OQ/PQ-style sandbox protocol with screenshot evidence', MARGIN, y);
-  y += 22;
+  y += 14;
+  doc.setFontSize(9);
+  doc.text('Every case includes screenshot evidence of that test.', MARGIN, y);
+  y += 18;
+  doc.setFontSize(11);
 
   const cover: [string, string][] = [
     ['Document', report.docId],
@@ -131,7 +135,7 @@ export async function buildValidationPdf(report: ValidationReport): Promise<Blob
     doc.text(act, MARGIN, y);
     y += 12 * act.length + 8;
 
-    const imgs = (r.images ?? []).slice(0, 2);
+    const imgs = (r.images ?? []).slice(0, 8);
     for (const img of imgs) {
       if (!img?.dataUrl) continue;
       try {

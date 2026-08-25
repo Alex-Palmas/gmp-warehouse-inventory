@@ -41,9 +41,9 @@ Every URS row must have an FS function and an OQ test. Automated vitest (`src/te
 | URS-25 Sample / retain child serial | F-14 | OQ-23 | — | `serialization.test.ts` |
 | URS-26 Location barcode putaway | F-14 | OQ-24 | PQ-07 | — |
 | URS-27 Clickable dashboard KPIs | F-09 | OQ-14 | — | `kpiFilter.test.ts` |
-| URS-28 CoA / certificate attachments | F-02 receipt; attachments store | — | — | `attachments.test.ts` |
-| URS-29 Material Transfer e-sign A/B/C | F-11 request / MTF | — | — | `mtf.test.ts`, `serialization.test.ts` |
-| URS-30 Sandbox self-validation / OQ evidence | Validation page; `runSelfValidation` vs `gmp-wh-inv-oq` | automated OQ evidence (not executed OQ) | — | `selfValidation.test.ts` |
+| URS-28 CoA / certificate attachments | F-02 receipt; attachments store | OQ-ATT, ATT-SERIAL, ATT-BATCH | — | `attachments.test.ts`, sandbox OQ |
+| URS-29 Material Transfer e-sign A/B/C | F-11 request / MTF | OQ-22, PQ-04, PROC-DEST-LVM | PQ-04 | `mtf.test.ts`, `serialization.test.ts`, sandbox OQ |
+| URS-30 Sandbox self-validation / OQ evidence | Validation page; `runSelfValidation` vs `gmp-wh-inv-oq` | VAL-SOD, TM-01 | — | `selfValidation.test.ts` (sandbox evidence — not executed OQ) |
 
 Part 11 mapping detail: `docs/13-Part11-Access-and-Audit.md`. Access defaults: `docs/11-Access-Control-Matrix.md`. Request/serialization: `docs/12-Material-Request-and-Serialization.md`.
 
@@ -53,3 +53,23 @@ Blank approval:
 |------|------|------|-----------|
 | Author | [OWNER] | [DATE] | |
 | QA | | | |
+
+
+## Extension families (sandbox OQ, not approved IQ/OQ/PQ)
+
+The in-app protocol also runs named extension cases. These are **automated sandbox evidence** with screenshot proof cards. They are not a substitute for site-executed IQ/OQ/PQ and live lots were not used.
+
+| Family | Prefix | Coverage |
+|--------|--------|----------|
+| Trace | TM-* | URS coverage, documented ids, capability columns, NAV caps |
+| HMI | HMI-* | Vocabularies, banner/constants, e-sign shape, hash routes, status chips, scan parse, password policy |
+| Limits | LIM-* | Container count, qty, sample/issue/count bounds, reason required, attachments type/size, e-sign, serial/user uniqueness |
+| RBAC | RBAC-* | Every role × capability matrix, nav, view, and each mutating API against defaultAllows |
+| Negatives | NEG-* | Illegal state (issue quarantine/hold/expired/destroyed/rejected, own-receipt SoD, self-approve, reserved issue, immutable audit, no user delete) |
+| Part 11 | P11-* | Generic login error, lockout 5, audit role/actions, reason for change, hashed backup, idle constant |
+| Process | PROC-* | FEFO, MTF stock warning, cell-bank QA, destinations, batch release, return/partial issue, sample/retain, id formats |
+| Attachments | ATT-* | Serial vs receipt-batch scope; QA can attach |
+| Backup | BKP-* | exportBackup keys and attachment bytes |
+| Isolation | ISO-* | Protocol uses `gmp-wh-inv-oq`; live session is not logged out |
+
+Source of truth for URS → core OQ ids: `src/lib/traceMatrix.ts` (keep this markdown table in sync).

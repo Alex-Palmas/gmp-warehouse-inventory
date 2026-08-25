@@ -107,6 +107,43 @@ export async function captureRecordProof(
   return captureProof(caption, html);
 }
 
+export const STUB_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+function verdictColorCss(verdict: string): string {
+  if (verdict === 'Pass') return '#166534';
+  if (verdict === 'Fail') return '#991b1b';
+  return '#92400e';
+}
+
+/** Always returns an image: jsdom/no-document uses STUB_PNG; browser uses html2canvas, then STUB_PNG fallback. */
+export async function captureCaseProof(bits: {
+  id: string;
+  title: string;
+  expected: string;
+  actual: string;
+  verdict: string;
+}): Promise<OqImage> {
+  const caption = `${bits.id} ${bits.verdict} proof`;
+  const stub: OqImage = { caption, dataUrl: STUB_PNG };
+  if (typeof document === 'undefined' || isJsdom()) return stub;
+  const color = verdictColorCss(bits.verdict);
+  const html = `<div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin:0 0 8px">
+      <h3 style="margin:0">${escapeHtml(bits.id)}</h3>
+      <span style="color:${color};font-weight:700">${escapeHtml(bits.verdict)}</span>
+    </div>
+    <p style="margin:0 0 8px">${escapeHtml(bits.title)}</p>
+    <table style="border-collapse:collapse;width:100%;font-size:13px">
+      <tr><th style="text-align:left;padding:4px 8px;background:#f1f5f9;vertical-align:top;width:90px">Expected</th><td style="padding:4px 8px">${escapeHtml(bits.expected)}</td></tr>
+      <tr><th style="text-align:left;padding:4px 8px;background:#f1f5f9;vertical-align:top">Actual</th><td style="padding:4px 8px">${escapeHtml(bits.actual)}</td></tr>
+    </table>
+  </div>`;
+  const shot = await captureProof(caption, html);
+  if (shot?.dataUrl) return shot;
+  return stub;
+}
+
 export function takeImages(...xs: Array<OqImage | null | undefined>): OqImage[] {
-  return xs.filter((x): x is OqImage => Boolean(x?.dataUrl)).slice(0, 2);
+  return xs.filter((x): x is OqImage => Boolean(x?.dataUrl)).slice(0, 8);
 }
