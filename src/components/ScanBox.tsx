@@ -1,27 +1,54 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { parseScanPayload } from '../lib/serial';
+import { isLocationCode } from '../lib/locations';
+import { scanErr, scanOk } from '../lib/scanFeedback';
+
+export const SCAN_EVENT = 'gmp-wh-scan';
 
 export function ScanBox() {
   const [v, setV] = useState('');
   const nav = useNavigate();
+  const loc = useLocation();
   const ref = useRef<HTMLInputElement>(null);
+  const onPick = loc.pathname.startsWith('/requests');
+  const onTransfer = loc.pathname.startsWith('/transfer');
 
   function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const s = v.trim();
-      if (!s) return;
-      nav(`/scan?serial=${encodeURIComponent(s)}`);
-      setV('');
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const s = parseScanPayload(v);
+    if (!s) {
+      scanErr('Empty scan');
+      return;
     }
+    window.dispatchEvent(
+      new CustomEvent(SCAN_EVENT, { detail: { serial: s, locationCode: isLocationCode(s) ? s : undefined } }),
+    );
+    if (!onPick && !onTransfer) {
+      if (isLocationCode(s)) {
+        scanOk(s);
+        nav(`/transfer?loc=${encodeURIComponent(s)}`);
+      } else {
+        scanOk(s);
+        nav(`/scan?serial=${encodeURIComponent(s)}`);
+      }
+    }
+    setV('');
   }
+
+  const placeholder = onPick
+    ? 'Scan serial to add to open request, then Enter'
+    : onTransfer
+      ? 'Scan container serial, then location barcode LOC-…'
+      : 'HID scanner or type serial / LOC-…, then Enter';
 
   return (
     <div className="scan no-print">
       <span className="mono">SCAN</span>
       <input
         ref={ref}
-        placeholder="HID scanner or type serial, then Enter"
+        placeholder={placeholder}
         value={v}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={onKey}

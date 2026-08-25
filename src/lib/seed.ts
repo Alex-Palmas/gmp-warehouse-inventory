@@ -2,7 +2,7 @@ import type { InventoryRecord, Material, UserRecord } from '../types';
 import { getDb } from './db';
 import { hashPasswordSha256Salt } from './crypto';
 import { nowUtcIso } from './dates';
-import { DEFAULT_ROLES, buildDefaultMatrixDocument, resolveRoleId, setMatrixCacheForTests } from './permissions';
+import { DEFAULT_ROLES, buildDefaultMatrixDocument, hydrateMatrixDocument, resolveRoleId, setMatrixCacheForTests } from './permissions';
 
 const DEMO_SALT = 'gmp-demo-salt-v1';
 
@@ -14,6 +14,7 @@ const DEMO_USERS: { userId: string; fullName: string; role: string; password: st
   { userId: 'qc', fullName: 'Morgan QC', role: 'qc', password: 'Qc123!' },
   { userId: 'wh', fullName: 'Sam Operator', role: 'operator', password: 'Wh123!' },
   { userId: 'ro', fullName: 'Riley ReadOnly', role: 'readonly', password: 'Ro123!' },
+  { userId: 'lab', fullName: 'Lee Lab Requester', role: 'requester', password: 'LabUser123!x' },
 ];
 
 const MATERIALS: Omit<Material, 'createdBy' | 'createdOnUtc' | 'modifiedBy' | 'modifiedOnUtc'>[] = [
@@ -163,6 +164,12 @@ async function seedAccessControl(): Promise<void> {
   }
   if (!(await db.get('meta', 'permissionMatrix'))) {
     await db.put('meta', buildDefaultMatrixDocument(), 'permissionMatrix');
+  } else {
+    const existing = await db.get('meta', 'permissionMatrix');
+    if (existing) {
+      const hydrated = hydrateMatrixDocument(existing);
+      await db.put('meta', hydrated, 'permissionMatrix');
+    }
   }
   setMatrixCacheForTests(null);
   const utc = '2026-01-15T16:00:00.000Z';
@@ -208,9 +215,37 @@ async function seedAccessControl(): Promise<void> {
   }
 }
 
+export async function migrateInventoryRecords(): Promise<void> {
+  const db = await getDb();
+  if (!db.objectStoreNames.contains('inventory')) return;
+  const all = (await db.getAll('inventory')) as InventoryRecord[];
+  for (const r of all) {
+    let dirty = false;
+    const next: InventoryRecord = { ...r };
+    if (!next.receiptBatchId) {
+      next.receiptBatchId = next.serial;
+      dirty = true;
+    }
+    if (!next.containerIndex) {
+      next.containerIndex = 1;
+      dirty = true;
+    }
+    if (!next.recordKind) {
+      next.recordKind = 'container';
+      dirty = true;
+    }
+    if (next.qtyPerContainer == null) {
+      next.qtyPerContainer = next.qtyReceived || next.currentQty;
+      dirty = true;
+    }
+    if (dirty) await db.put('inventory', next);
+  }
+}
+
 export async function ensureSeeded(): Promise<void> {
   const db = await getDb();
   await seedAccessControl();
+  await migrateInventoryRecords();
   if (await db.get('meta', 'seeded')) return;
   const utc = '2026-01-15T16:00:00.000Z';
   for (const u of DEMO_USERS) {
@@ -258,7 +293,75 @@ export async function ensureSeeded(): Promise<void> {
     inv('WH-2026-000014', 'API-001', 'Ibuprofen', 'API', 'Issued', 0, 'kg', '2027-01-20', 'MFR-IBU-3001', 'QD'),
   ];
   for (const r of rows) await db.put('inventory', r);
-  await db.put('meta', { year: 2026, lastN: 14 }, 'serialCounter');
+
+  // Multi-vial receipt: 6 unique serials, one receiptBatchId (21 CFR 211.80(d) each-container).
+  const vialBatch = 'RCV-2026-000001';
+  const vialUtc = '2026-03-01T17:00:00.000Z';
+  for (let i = 0; i < 6; i++) {
+    const serial = `WH-2026-${String(15 + i).padStart(6, '0')}`;
+    const rec = inv(serial, 'RS-001', 'Ibuprofen Reference Standard', 'Reference Standard', 'Released', 10, 'mg', '2026-10-01', 'USP-RS-IBU', 'QB');
+    rec.receiptBatchId = vialBatch;
+    rec.containerIndex = i + 1;
+    rec.numberOfContainers = 6;
+    rec.containerType = 'Vial';
+    rec.qtyPerContainer = 10;
+    rec.qtyReceived = 10;
+    rec.currentQty = 10;
+    rec.recordKind = 'container';
+    rec.storageCondition = '2–8 °C';
+    rec.createdOnUtc = vialUtc;
+    rec.modifiedOnUtc = vialUtc;
+    rec.comments = 'Seed: per-container serialized vials (1 of 6)';
+    await db.put('inventory', rec);
+  }
+
+  // Multi-drum receipt: 3 unique serials, shared receiptBatchId, Quarantine for batch QA release demo.
+  const drumBatch = 'RCV-2026-000002';
+  const drumUtc = '2026-03-02T17:00:00.000Z';
+  for (let i = 0; i < 3; i++) {
+    const serial = `WH-2026-${String(21 + i).padStart(6, '0')}`;
+    const rec = inv(serial, 'RM-001', 'Lactose Monohydrate', 'Excipient', 'Quarantine', 25, 'kg', '2028-11-01', 'LAC-9930', 'Q3');
+    rec.receiptBatchId = drumBatch;
+    rec.containerIndex = i + 1;
+    rec.numberOfContainers = 3;
+    rec.containerType = 'Drum';
+    rec.qtyPerContainer = 25;
+    rec.qtyReceived = 25;
+    rec.currentQty = 25;
+    rec.recordKind = 'container';
+    rec.createdOnUtc = drumUtc;
+    rec.modifiedOnUtc = drumUtc;
+    rec.comments = 'Seed: per-container serialized drums (1 of 3)';
+    rec.qaDisposition = undefined;
+    rec.qaEsign = undefined;
+    rec.modifiedBy = 'admin';
+    await db.put('inventory', rec);
+  }
+
+  // Sample child pulled from WH-2026-000005 (MCC drum).
+  const parent = (await db.get('inventory', 'WH-2026-000005')) as InventoryRecord | undefined;
+  if (parent) {
+    parent.currentQty = 39.5;
+    parent.linkedSampleIds = 'WH-2026-000024';
+    await db.put('inventory', parent);
+  }
+  const sample = inv('WH-2026-000024', 'RM-002', 'Microcrystalline Cellulose', 'Sample', 'Released', 0.5, 'kg', '2027-08-20', 'MCC-2201', 'Q4');
+  sample.receiptBatchId = 'RCV-2026-000003';
+  sample.containerIndex = 1;
+  sample.numberOfContainers = 1;
+  sample.containerType = 'Bottle';
+  sample.qtyPerContainer = 0.5;
+  sample.qtyReceived = 0.5;
+  sample.currentQty = 0.5;
+  sample.recordKind = 'sample';
+  sample.parentSerial = 'WH-2026-000005';
+  sample.itemType = 'Sample';
+  sample.comments = 'Seed: QC sample pulled from parent WH-2026-000005';
+  sample.qaDisposition = 'Release';
+  await db.put('inventory', sample);
+
+  await db.put('meta', { year: 2026, lastN: 24 }, 'serialCounter');
+  await db.put('meta', { year: 2026, lastN: 3 }, 'receiptBatchCounter');
   await db.put('meta', true, 'seeded');
 }
 
@@ -297,6 +400,10 @@ function inv(
     uom,
     numberOfContainers: 1,
     containerType: uom === 'each' || uom === 'bottle' ? 'Carton' : 'Drum',
+    receiptBatchId: serial,
+    containerIndex: 1,
+    qtyPerContainer: qty === 0 ? 25 : qty,
+    recordKind: 'container',
     dateOfManufacture: '2025-01-15',
     receiptDate: '2026-02-01',
     expiryDate: expiry,

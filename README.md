@@ -1,17 +1,17 @@
-# GMP Warehouse Inventory (DOC-WH-INV-001 v1.1)
+# GMP Warehouse Inventory (DOC-WH-INV-001 v1.2)
 Standalone **system of record** for warehouse containers in a pharmaceutical / biotech facility, plus Excel reports and a CSV documentation pack.
 
 **VALIDATION STATUS: Not validated — do not use for GMP decisions until IQ/OQ/PQ approved.**
 
 This application is a technical control set that *can support* 21 CFR Part 11, 21 CFR 211 warehouse/records, EU GMP Annex 11, ALCOA+, and GAMP 5 **after** the site executes IQ/OQ/PQ, trains users, and adopts SOPs. It is **not** certified, validated, or fully compliant as shipped.
 
-Document number: `DOC-WH-INV-001` · Version: `1.1` · App version: `1.1.0`
+Document number: `DOC-WH-INV-001` · Version: `1.2` · App version: `1.2.0`
 
 ## Intended use
 
-Local (single-node, browser) inventory register for unique container serials (`WH-YYYY-NNNNNN`), goods receipt into Quarantine, QA e-signed disposition, location transfer, issue/dispense (FEFO warning + expiry block), return, hold, cycle count, destruction, append-only audit trail, JSON backup/restore, and Excel reports (reports are not the system of record).
+Local (single-node, browser) inventory register for **per-container** serials (`WH-YYYY-NNNNNN`), receipt batches (`RCV-YYYY-NNNNNN`), goods receipt into Quarantine, QA e-signed lot-release of sibling containers, sampling, material submissions, material requests (`MR-YYYY-NNNNNN`) with FEFO auto-reserve → scan pick → issue, location barcodes, append-only audit trail, JSON backup/restore, and Excel reports (reports are not the system of record).
 
-See `docs/10-Intended-Use-Known-Limitations.md` and `docs/11-Access-Control-Matrix.md`.
+See `docs/10-Intended-Use-Known-Limitations.md`, `docs/11-Access-Control-Matrix.md`, and `docs/12-Material-Request-and-Serialization.md`.
 
 ## How to run
 
@@ -55,20 +55,23 @@ Demo accounts are seeded on first launch. **Passwords are documented here only. 
 | qc | QC | Qc123! |
 | wh | Warehouse Operator | Wh123! |
 | ro | Read-Only | Ro123! |
+| lab | Requester / Lab-Production | LabUser123!x |
 
 Password storage: PBKDF2-SHA-256 (100000 iterations, 16-byte salt) via Web Crypto. Seeded hashes start as SHA-256(salt:password) and are upgraded to PBKDF2 on first successful login. Last 4 hashes retained. 90-day expiry. 5 failed attempts lock 15 minutes (or until admin unlock). Same error for unknown user vs bad password. First login must change the temp password (min 12 chars, upper+lower+digit+special). Production MUST change all demo passwords.
 
 Idle session timeout is 15 minutes. Re-authentication is required for QA e-signatures (password re-entry; printed name, user ID, datetime, meaning of signature captured).
 
-## Typical flow (OQ-style)
+## Typical flow (OQ-style) — v1.2
 
-1. Log in as `wh`. Change the temporary password. Goods Receipt → serial allocated `WH-YYYY-NNNNNN`, status Quarantine, optional label print.
-2. Print 2x1 in or 4x2 in warehouse label (Code 128 of serial; QR of serial|lot|expiry|status).
-3. Scan the serial (HID keyboard-wedge, Enter-terminated) in the black SCAN bar → lookup.
-4. Log in as `qa` (change temp password). QA Disp. → Release with e-sign. QA cannot e-sign a container they received.
-5. Log in as `wh`. Issue → FEFO warning if not earliest-expiry released lot; expired / non-Released stock is blocked.
-6. Log in as `sysadmin` to review or adjust the Access matrix (e-sign on save).
-7. Open Audit — every mutation is an append-only row (UTC + local America/Los_Angeles display).
+1. Log in as `lab` (temp password `LabUser123!x`, 12-char policy). Change password. **Submit material** if the item is not on the master; QA/supervisor approves → Material Master. **Request material**: typeahead, qty, needed-by, Enter. FEFO Released stock is auto-reserved.
+2. Log in as `wh`. Change temp password. **Receive**: N containers × qty per container (e.g. 24 vials × 10 mL) → N unique serials, one `receiptBatchId`, all Quarantine. Duplicate last receipt copies material/supplier/location. Print all N labels (Code 128 of serial; QR `serial|lot|expiry|status|containerType`).
+3. Scan (HID Enter-terminated). Success/error beep + flash. On Requests, scan adds to the open pick (wrong material/status/expired = error beep, not added).
+4. Log in as `qa`. QA Disp. default = release entire receipt batch (one e-sign, audit each serial). Optional single-container reject. Samples: pull sample/retain child serial from a parent.
+5. As `wh`, Requests queue: walk-path sorted by location, print pick ticket, pick reserved serials, confirm issue. Movement + audit include `requestId`. Direct Issue remains for emergency.
+6. As `lab`, inbox “ready” → confirm received → Closed.
+7. Transfer/putaway: scan container, then scan `LOC-…` location barcode. Print location labels from Transfer.
+8. Dashboard KPI cards (Quarantine, Released, Hold, Rejected, Restricted, Expired, Exp 30d, Exp 90d, open/reserved requests) are clickable — they open the register or request queue already filtered (`#/register?status=Released`, `#/register?filter=exp30`, `#/requests?view=open`). Clear the filter to see all.
+9. `sysadmin` Access matrix (e-sign on save). Audit is append-only (UTC + America/Los_Angeles).
 
 ## Print labels
 
@@ -76,13 +79,13 @@ Form Labels (or check Print label after save on receipt). Sizes: 2x1 inch and 4x
 
 ## Scanners
 
-HID keyboard-wedge scanners that type the serial and send Enter are supported. The SCAN box is on every authenticated page. Payload is the serial (WH-YYYY-NNNNNN).
+HID keyboard-wedge scanners that type the serial (or QR payload `serial|lot|expiry|status|containerType`, or location `LOC-…`) and send Enter are supported. The SCAN box is on every authenticated page. On the Requests pick page, scan adds the serial to the open request. On Transfer, scan serial then location barcode to put away.
 
 ## Backup / restore / Excel
 
 - Dashboard → Backup JSON (capability backupRestore): one file of ALL stores including roles, permission matrix, and matrix history.
 - Access page → restore JSON (replaces all local stores; audited).
-- Dashboard → Export Excel reports: Inventory Register, Material Master, Movement Log, Audit Trail, User Access Log, Roles, Permission Matrix, User Access List.
+- Dashboard → Export Excel reports: Inventory Register, Material Master, Movement Log, Audit Trail, User Access Log, Request Log, Material Submissions, Roles, Permission Matrix, User Access List.
 
 Companion workbook: `exports/GMP_Warehouse_Inventory_Register_v1.1.xlsx`
 
@@ -119,6 +122,7 @@ Templates with `[SITE]`, `[OWNER]`, `[DATE]` placeholders — **not pre-approved
 9. Change control form
 10. Intended use / known limitations
 11. Access control matrix (default roles, SoD, 21 CFR 11.10(d)(g))
+12. Material request and serialization (per-container serials, request→pick→issue)
 
 ## Default roles (seeded, system=true)
 
@@ -129,7 +133,8 @@ Templates with `[SITE]`, `[OWNER]`, `[DATE]` placeholders — **not pre-approved
 | Warehouse Operator | Receive, transfer, issue, return, cycle count, reprint, scan, view register/dashboard. |
 | QA | Disposition, destroy, hold, materials, e-sign, reprint, view, export, backup. Not receive/issue/transfer (SoD). |
 | QC | View, scan, cycle count, reprint. |
-| Read-Only | View dashboard, register, scan, audit. No mutations. |
+| Read-Only | View dashboard, register, scan, audit, inbox. No mutations. |
+| Requester / Lab-Production | Submit material, submit request, confirm received, view, inbox. Not warehouse pick/receive/QA disposition. |
 
 Admins may add custom roles. System roles cannot be deleted. Users cannot be deleted — only deactivated.
 
@@ -140,3 +145,8 @@ Receipts always default to Quarantine. No hard-delete of inventory (Issued / Con
 Vite + React + TypeScript SPA, HashRouter, IndexedDB (idb), ExcelJS, JsBarcode, qrcode, Vitest.
 
 Dates stored as ISO UTC; UI displays America/Los_Angeles.
+
+
+## Later (not in v1.2)
+
+Deferred: kitting / BOM issue, ASN / CSV inbound import, temperature excursion logs.

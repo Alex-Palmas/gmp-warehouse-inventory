@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Document | IU-WH-INV-001 |
-| Version | 1.1 (draft template) |
+| Version | 1.2 (draft template) |
 | Site | [SITE] |
 | Owner | [OWNER] |
 | Date | [DATE] |
@@ -11,11 +11,11 @@
 
 ## 1. Intended use
 
-DOC-WH-INV-001 v1.1 is a **local browser application** intended to be the **system of record** for warehouse container inventory at [SITE] **only after** IQ/OQ/PQ are approved, users are trained, SOPs are effective, and demo accounts are removed.
+DOC-WH-INV-001 v1.2 is a **local browser application** intended to be the **system of record** for warehouse container inventory at [SITE] **only after** IQ/OQ/PQ are approved, users are trained, SOPs are effective, and demo accounts are removed.
 
 It records identity, quantity, status, location, and QA disposition of GMP-relevant materials and supports barcode labeling and HID scanning.
 
-Excel workbooks (in-app export and `exports/GMP_Warehouse_Inventory_Register_v1.1.xlsx`) are **reporting templates / offline copies**, not Part 11 systems and not the system of record.
+Excel workbooks (in-app export and `exports/GMP_Warehouse_Inventory_Register_v1.1.xlsx` (structure; v1.2 live export adds Request Log and Material Submissions)) are **reporting templates / offline copies**, not Part 11 systems and not the system of record.
 
 ## 2. Not intended for
 

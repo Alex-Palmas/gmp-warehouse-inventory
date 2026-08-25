@@ -24,6 +24,10 @@ import { AccessControl } from './pages/AccessControl';
 import { InventoryRegister } from './pages/InventoryRegister';
 import { AuditTrail } from './pages/AuditTrail';
 import { RecordDetail } from './pages/RecordDetail';
+import { Requests } from './pages/Requests';
+import { SubmitMaterial } from './pages/SubmitMaterial';
+import { Inbox } from './pages/Inbox';
+import { Samples } from './pages/Samples';
 
 function Guard({ session, onLogout }: { session: Session; onLogout: () => void }) {
   return <Layout session={session} onLogout={onLogout} />;
@@ -155,6 +159,31 @@ export default function App() {
           element={
             <CapRoute session={session} cap="qaDisposition">
               <QADisposition session={session} />
+            </CapRoute>
+          }
+        />
+        <Route path="requests" element={<Requests session={session} />} />
+        <Route
+          path="submit-material"
+          element={
+            <CapRoute session={session} cap="submitMaterial">
+              <SubmitMaterial session={session} />
+            </CapRoute>
+          }
+        />
+        <Route
+          path="inbox"
+          element={
+            <CapRoute session={session} cap="viewInbox">
+              <Inbox session={session} />
+            </CapRoute>
+          }
+        />
+        <Route
+          path="samples"
+          element={
+            <CapRoute session={session} cap="samplePull">
+              <Samples session={session} />
             </CapRoute>
           }
         />

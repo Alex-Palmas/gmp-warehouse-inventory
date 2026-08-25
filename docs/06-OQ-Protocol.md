@@ -3,12 +3,12 @@
 | Field | Value |
 |-------|-------|
 | Document | OQ-WH-INV-001 |
-| Version | 1.1 (draft template) |
+| Version | 1.2 (draft template) |
 | Site | [SITE] |
 | Owner | [OWNER] |
 | Date | [DATE] |
 | Status | **Not approved / not executed** |
-| Software | DOC-WH-INV-001 v1.1 |
+| Software | DOC-WH-INV-001 v1.2 |
 
 Automated unit tests (`vitest`) cover serial format, workflow permissions, audit API immutability, and FEFO logic. They **do not** replace this OQ. Record unit-test log attachment: _______________
 
@@ -166,7 +166,7 @@ Confirm quarantine count includes S2; expired list includes 000007; 30/90 day li
 
 ### OQ-15 Document control banner (URS-18)
 
-Every page shows validation banner and footer DOC-WH-INV-001 v1.1. **Pass/Fail:** ___
+Every page shows validation banner and footer DOC-WH-INV-001 v1.2. **Pass/Fail:** ___
 
 ---
 
@@ -237,3 +237,48 @@ OQ is [ ] Passed  [ ] Passed with deviations  [ ] Failed
 3. If a waived dual-capability role is available: that user receives Sy, then attempts QA Release on Sy → blocked with SoD message. A **different** QA user can release Sy.
 
 **Expected:** createdBy === signer is rejected. **Pass/Fail:** ___
+
+
+---
+
+### OQ-21 Per-container serialization (URS serialization)
+
+**Steps**
+1. As `wh`, Goods Receipt: material with sampling not required, N containers = 5, container type Vial, qty per container = 1 (e.g. 5 × 1 vial). Submit.
+2. Confirm 5 unique serials `WH-YYYY-NNNNNN` and one shared `receiptBatchId` `RCV-YYYY-NNNNNN`. Register groups them (expandable).
+3. Print all 5 labels (page-break). Scan one Code 128 → lookup of that serial only.
+4. As `qa`, Release with scope = entire receipt batch, one e-sign. All 5 siblings become Released. Audit has a QA_DISPOSITION row per serial.
+5. Repeat a receipt of 3 drums × 25 kg. Confirm 3 serials, not one serial covering 3 drums.
+
+**Expected:** One serial per physical unit; batch grouping retained. **Pass/Fail:** ___
+
+---
+
+### OQ-22 Material request → pick → issue (URS request)
+
+**Steps**
+1. As `lab` (change temp password `LabUser123!x`). Request material: typeahead a Released material, qty, needed-by, Enter. Note request id MR-… and any FEFO reserve.
+2. As a second requester session (or second request), confirm the same reserved serial cannot be picked for the other request.
+3. As `wh`, Requests → warehouse queue. Confirm suggested containers are sorted by location. Print pick ticket. Scan a **quarantine** serial → blocked, error beep, not added. Scan a correct Released serial → success beep, added.
+4. Confirm issue. Movement log and audit include requestId. `lab` inbox shows ready. Confirm received → Closed.
+5. Cancel a Submitted request: reservation released (Reserved badge gone).
+
+**Expected:** Authorized requisition; FEFO reserve; scan cross-check; chain of custody. **Pass/Fail:** ___
+
+---
+
+### OQ-23 Sample pull
+
+**Steps:** As `qa` or `qc`, Samples: pull qty from a parent drum. Child serial recordKind=sample, parentSerial set, parent currentQty decremented, own barcode. **Pass/Fail:** ___
+
+---
+
+### OQ-24 Location barcode putaway
+
+**Steps:** Transfer → print a location label. Scan a container serial, then scan `LOC-…` barcode. Container location updates; movement TRANSFER. **Pass/Fail:** ___
+
+---
+
+### OQ-25 Submit material
+
+**Steps:** As `lab`, submit a new material. As `qa`, approve with a code. Material appears on Material Master and in Receive dropdown. Inbox notified. **Pass/Fail:** ___

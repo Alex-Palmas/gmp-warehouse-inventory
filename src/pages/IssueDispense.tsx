@@ -41,8 +41,13 @@ export function IssueDispense({ session }: { session: Session }) {
 
   return (
     <form className="card grid" onSubmit={submit}>
-      <h1>Issue / dispense</h1>
-      <p className="help">Only Released, non-expired stock may be issued. FEFO warning if an earlier-expiry Released lot exists.</p>
+      <h1>Issue / dispense (emergency / direct)</h1>
+      <p className="help">
+        Primary path is <strong>Requests → Pick → Issue</strong>. This form is for supervisor/operator emergency
+        issue without a requisition. Only Released, non-expired stock may be issued. FEFO warning if an
+        earlier-expiry Released lot exists. Whole-vial issue consumes the serial; partial drum issue reduces
+        currentQty (Consumed at 0).
+      </p>
       <SerialSelect records={rows} value={serial} onChange={setSerial} />
       <RecordSummary rec={rec} />
       {block.blocked && rec && <p className="err">{block.reason}</p>}

@@ -2,8 +2,11 @@ import { openDB, type IDBPDatabase } from 'idb';
 import type {
   AccessLogEntry,
   AuditEntry,
+  InboxMessage,
   InventoryRecord,
   Material,
+  MaterialRequest,
+  MaterialSubmission,
   Movement,
   PermissionMatrixDocument,
   PermissionMatrixHistory,
@@ -13,7 +16,7 @@ import type {
 } from '../types';
 
 const DB_NAME = 'gmp-wh-inv';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let _db: IDBPDatabase | null = null;
 
@@ -35,6 +38,11 @@ export async function getDb(): Promise<IDBPDatabase> {
       if (!db.objectStoreNames.contains('roles')) db.createObjectStore('roles', { keyPath: 'roleId' });
       if (!db.objectStoreNames.contains('permissionMatrixHistory'))
         db.createObjectStore('permissionMatrixHistory', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('materialSubmissions'))
+        db.createObjectStore('materialSubmissions', { keyPath: 'submissionId' });
+      if (!db.objectStoreNames.contains('materialRequests'))
+        db.createObjectStore('materialRequests', { keyPath: 'requestId' });
+      if (!db.objectStoreNames.contains('inbox')) db.createObjectStore('inbox', { keyPath: 'id' });
     },
   });
   return _db;
@@ -60,5 +68,11 @@ export type BackupPayload = {
   permissionMatrix: PermissionMatrixDocument | null;
   permissionMatrixHistory: PermissionMatrixHistory[];
   serialCounter: SerialCounter | null;
+  receiptBatchCounter: SerialCounter | null;
+  requestCounter: SerialCounter | null;
+  submissionCounter: SerialCounter | null;
+  materialSubmissions: MaterialSubmission[];
+  materialRequests: MaterialRequest[];
+  inbox: InboxMessage[];
   seeded: boolean;
 };

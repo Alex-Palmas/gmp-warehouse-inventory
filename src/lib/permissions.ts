@@ -59,7 +59,7 @@ export const DEFAULT_ROLES: RoleRecord[] = [
   {
     roleId: 'operator',
     name: 'Warehouse Operator',
-    description: 'Receive, transfer, issue, return, cycle count, labels.',
+    description: 'Receive, transfer, issue, fulfill requests, return, cycle count, labels.',
     system: true,
     active: true,
   },
@@ -84,6 +84,13 @@ export const DEFAULT_ROLES: RoleRecord[] = [
     system: true,
     active: true,
   },
+  {
+    roleId: 'requester',
+    name: 'Requester / Lab-Production',
+    description: 'Submit material requests and new-material proposals. Confirm receipt. No warehouse pick/issue/QA disposition.',
+    system: true,
+    active: true,
+  },
 ];
 
 export function defaultMatrixRows(): MatrixRows {
@@ -94,10 +101,13 @@ export function defaultMatrixRows(): MatrixRows {
       'viewAudit',
       'viewAccessLog',
       'scanLookup',
+      'viewInbox',
       'adminUsers',
       'editPermissionMatrix',
       'exportReports',
       'backupRestore',
+      'submitMaterial',
+      'submitRequest',
     ]),
     supervisor: allowCaps([
       'viewDashboard',
@@ -105,6 +115,7 @@ export function defaultMatrixRows(): MatrixRows {
       'viewAudit',
       'viewAccessLog',
       'scanLookup',
+      'viewInbox',
       'receive',
       'transfer',
       'issue',
@@ -116,17 +127,24 @@ export function defaultMatrixRows(): MatrixRows {
       'adminUsers',
       'exportReports',
       'backupRestore',
+      'submitMaterial',
+      'submitRequest',
+      'fulfillRequest',
     ]),
     operator: allowCaps([
       'viewDashboard',
       'viewRegister',
       'scanLookup',
+      'viewInbox',
       'receive',
       'transfer',
       'issue',
       'returnToStock',
       'cycleCount',
       'reprintLabel',
+      'submitMaterial',
+      'submitRequest',
+      'fulfillRequest',
     ]),
     qa: allowCaps([
       'viewDashboard',
@@ -134,6 +152,7 @@ export function defaultMatrixRows(): MatrixRows {
       'viewAudit',
       'viewAccessLog',
       'scanLookup',
+      'viewInbox',
       'qaDisposition',
       'destroy',
       'hold',
@@ -142,9 +161,30 @@ export function defaultMatrixRows(): MatrixRows {
       'backupRestore',
       'eSign',
       'reprintLabel',
+      'submitMaterial',
+      'submitRequest',
+      'samplePull',
     ]),
-    qc: allowCaps(['viewDashboard', 'viewRegister', 'scanLookup', 'cycleCount', 'reprintLabel']),
-    readonly: allowCaps(['viewDashboard', 'viewRegister', 'scanLookup', 'viewAudit']),
+    qc: allowCaps([
+      'viewDashboard',
+      'viewRegister',
+      'scanLookup',
+      'viewInbox',
+      'cycleCount',
+      'reprintLabel',
+      'submitMaterial',
+      'submitRequest',
+      'samplePull',
+    ]),
+    readonly: allowCaps(['viewDashboard', 'viewRegister', 'scanLookup', 'viewAudit', 'viewInbox']),
+    requester: allowCaps([
+      'viewDashboard',
+      'viewRegister',
+      'scanLookup',
+      'viewInbox',
+      'submitMaterial',
+      'submitRequest',
+    ]),
   };
 }
 
@@ -158,7 +198,7 @@ export function buildDefaultMatrixDocument(): PermissionMatrixDocument {
     modifiedOnUtc: utc,
     approvedBy: 'system',
     approvedOnUtc: utc,
-    reasonForChange: 'Seeded default matrix (DOC-WH-INV-001 v1.1)',
+    reasonForChange: 'Seeded default matrix (DOC-WH-INV-001 v1.2)',
     meaningOfSignature: 'System seed',
   };
 }
@@ -201,6 +241,13 @@ export function evaluateSod(rows: MatrixRows, sod: SodRules): SodViolation[] {
         roleId,
         rule: 'editMatrixXorQaDisposition',
         message: `SoD: role "${roleId}" cannot combine editPermissionMatrix and qaDisposition.`,
+      });
+    }
+    if ((sod.qaDispositionXorFulfill ?? true) && r.qaDisposition && r.fulfillRequest) {
+      violations.push({
+        roleId,
+        rule: 'qaDispositionXorFulfill',
+        message: `SoD: role "${roleId}" cannot combine qaDisposition and fulfillRequest (QA does not pick/issue against requests).`,
       });
     }
   }
@@ -248,14 +295,34 @@ export function setMatrixCacheForTests(doc: PermissionMatrixDocument | null): vo
   _cache = doc;
 }
 
+export function hydrateMatrixDocument(doc: PermissionMatrixDocument): PermissionMatrixDocument {
+  const defaults = defaultMatrixRows();
+  const rows = cloneRows(doc.rows);
+  for (const [roleId, def] of Object.entries(defaults)) {
+    if (!rows[roleId]) {
+      rows[roleId] = { ...def };
+      continue;
+    }
+    const original = doc.rows[roleId] ?? {};
+    for (const cap of CAPABILITIES) {
+      if (!(cap in original)) {
+        rows[roleId][cap] = def[cap];
+      }
+    }
+  }
+  const sod = { ...DEFAULT_SOD, ...doc.sod };
+  return { ...doc, rows, sod };
+}
+
 export async function getLiveMatrix(): Promise<PermissionMatrixDocument> {
-  if (_cache) return _cache;
+  if (_cache) return hydrateMatrixDocument(_cache);
   try {
     const db = await getDb();
     const doc = (await db.get('meta', 'permissionMatrix')) as PermissionMatrixDocument | undefined;
     if (doc?.rows) {
-      _cache = doc;
-      return doc;
+      const hydrated = hydrateMatrixDocument(doc);
+      _cache = hydrated;
+      return hydrated;
     }
   } catch {
     /* tests / first boot — fall through to defaults */

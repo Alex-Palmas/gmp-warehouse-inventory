@@ -15,12 +15,15 @@ import { receiveGoods } from '../lib/inventory';
 import { LocationFields, emptyLocation } from '../components/fields';
 import { todayIsoDateInTz } from '../lib/dates';
 
+const UNIT_CONTAINERS = new Set(['Vial', 'Bottle', 'Ampoule']);
+const LAST_RECEIPT_KEY = 'gmp-last-receipt';
+
 export function GoodsReceipt({ session }: { session: Session }) {
   const allowed = useCap(session, 'receive');
   const [mats, setMats] = useState<Material[]>([]);
   const [code, setCode] = useState('');
   const [form, setForm] = useState<Partial<InventoryRecord>>({
-    qtyReceived: 0,
+    qtyPerContainer: 1,
     numberOfContainers: 1,
     uom: 'kg',
     containerType: 'Drum',
@@ -58,11 +61,23 @@ export function GoodsReceipt({ session }: { session: Session }) {
 
   const set = (k: keyof InventoryRecord, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
+  function onContainerType(t: string) {
+    setForm((f) => ({
+      ...f,
+      containerType: t as InventoryRecord['containerType'],
+      qtyPerContainer: UNIT_CONTAINERS.has(t) ? 1 : f.qtyPerContainer,
+    }));
+  }
+
+  const n = Number(form.numberOfContainers) || 0;
+  const per = Number(form.qtyPerContainer) || 0;
+  const total = n * per;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr('');
     try {
-      const rec = await receiveGoods(session, {
+      const recs = await receiveGoods(session, {
         materialCode: form.materialCode ?? '',
         materialName: form.materialName ?? '',
         itemType: form.itemType ?? 'Raw Material',
@@ -75,9 +90,9 @@ export function GoodsReceipt({ session }: { session: Session }) {
         poDeliveryNote: form.poDeliveryNote ?? '',
         coaNumber: form.coaNumber ?? '',
         internalLot: form.internalLot ?? '',
-        qtyReceived: Number(form.qtyReceived),
+        numberOfContainers: n,
+        qtyPerContainer: per,
         uom: form.uom ?? 'kg',
-        numberOfContainers: Number(form.numberOfContainers) || 1,
         containerType: form.containerType ?? 'Drum',
         dateOfManufacture: form.dateOfManufacture ?? '',
         receiptDate: form.receiptDate ?? todayIsoDateInTz(),
@@ -89,8 +104,32 @@ export function GoodsReceipt({ session }: { session: Session }) {
         linkedSampleIds: form.linkedSampleIds ?? '',
         comments: form.comments ?? '',
       });
-      if (printAfter) nav(`/reprint?serial=${rec.serial}&autoprint=1`);
-      else nav(`/record/${rec.serial}`);
+      try {
+        localStorage.setItem(
+          LAST_RECEIPT_KEY,
+          JSON.stringify({
+            materialCode: form.materialCode,
+            materialName: form.materialName,
+            manufacturer: form.manufacturer,
+            supplier: form.supplier,
+            containerType: form.containerType,
+            uom: form.uom,
+            location: form.location,
+            storageCondition: form.storageCondition,
+            numberOfContainers: form.numberOfContainers,
+            qtyPerContainer: form.qtyPerContainer,
+            samplingRequired: form.samplingRequired,
+            itemType: form.itemType,
+            gradeSpec: form.gradeSpec,
+            pharmacopeia: form.pharmacopeia,
+          }),
+        );
+      } catch {
+        /* ignore quota */
+      }
+      const batch = recs[0]?.receiptBatchId;
+      if (printAfter && batch) nav(`/reprint?batch=${encodeURIComponent(batch)}&autoprint=1`);
+      else if (recs[0]) nav(`/record/${recs[0].serial}`);
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : 'Receive failed');
     }
@@ -102,10 +141,51 @@ export function GoodsReceipt({ session }: { session: Session }) {
   return (
     <div>
       <h1>Goods receipt</h1>
-      <p className="help">Creates a unique serial WH-YYYY-NNNNNN. Status defaults to Quarantine. Serial is allocated only on successful submit.</p>
+      <p className="help">
+        Each physical unit (vial, bottle, drum, bag) receives its own unique serial WH-YYYY-NNNNNN.
+        All N serials share one receiptBatchId (RCV-YYYY-NNNNNN) and start in Quarantine (21 CFR 211.80(d),
+        211.82). Serials are allocated only on successful submit.
+      </p>
+      <p className="no-print">
+        <button
+          className="btn btn-sec"
+          type="button"
+          onClick={() => {
+            try {
+              const raw = localStorage.getItem(LAST_RECEIPT_KEY);
+              if (!raw) {
+                setErr('No previous receipt in this browser');
+                return;
+              }
+              const last = JSON.parse(raw) as Partial<InventoryRecord>;
+              setForm((f) => ({
+                ...f,
+                ...last,
+                manufacturerLot: '',
+                supplierLot: '',
+                internalLot: '',
+                poDeliveryNote: '',
+                coaNumber: '',
+                expiryDate: '',
+                retestDate: '',
+                dateOfManufacture: '',
+                receiptDate: todayIsoDateInTz(),
+                comments: '',
+              }));
+              if (last.materialCode) setCode(last.materialCode);
+              setErr('');
+            } catch {
+              setErr('Could not load last receipt');
+            }
+          }}
+        >
+          Duplicate last receipt
+        </button>
+        <span className="help"> Copies material, supplier, location, container type. Change lot / qty / N.</span>
+      </p>
       <form onSubmit={submit} className="card grid">
         <label>
-          Material
+          Material (approved Material Master only)
           <select value={code} onChange={(e) => applyMat(e.target.value)} required>
             <option value="">— select —</option>
             {mats.filter((m) => m.active).map((m) => (
@@ -169,8 +249,34 @@ export function GoodsReceipt({ session }: { session: Session }) {
         </div>
         <div className="grid grid-4">
           <label>
-            Qty received
-            <input type="number" step="0.0001" min="0" value={form.qtyReceived ?? 0} onChange={(e) => set('qtyReceived', Number(e.target.value))} required />
+            N containers
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={form.numberOfContainers ?? 1}
+              onChange={(e) => set('numberOfContainers', Number(e.target.value))}
+              required
+            />
+          </label>
+          <label>
+            Container type
+            <select value={form.containerType} onChange={(e) => onContainerType(e.target.value)}>
+              {CONTAINER_TYPES.map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Qty per container
+            <input
+              type="number"
+              step="0.0001"
+              min="0"
+              value={form.qtyPerContainer ?? 1}
+              onChange={(e) => set('qtyPerContainer', Number(e.target.value))}
+              required
+            />
           </label>
           <label>
             UOM
@@ -180,19 +286,11 @@ export function GoodsReceipt({ session }: { session: Session }) {
               ))}
             </select>
           </label>
-          <label>
-            # containers
-            <input type="number" min="1" value={form.numberOfContainers ?? 1} onChange={(e) => set('numberOfContainers', Number(e.target.value))} />
-          </label>
-          <label>
-            Container type
-            <select value={form.containerType} onChange={(e) => set('containerType', e.target.value)}>
-              {CONTAINER_TYPES.map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
         </div>
+        <p className="help">
+          Will allocate <strong>{n}</strong> unique serials: {n} × {form.containerType ?? 'container'} × {per}{' '}
+          {form.uom} (total {total} {form.uom}). Vial/bottle typically 1 each; drum/bag have fill quantity.
+        </p>
         <div className="grid grid-4">
           <label>
             Date of manufacture
@@ -235,11 +333,11 @@ export function GoodsReceipt({ session }: { session: Session }) {
           <textarea value={form.comments ?? ''} onChange={(e) => set('comments', e.target.value)} />
         </label>
         <label className="row">
-          <input type="checkbox" checked={printAfter} onChange={(e) => setPrintAfter(e.target.checked)} /> Print label after save
+          <input type="checkbox" checked={printAfter} onChange={(e) => setPrintAfter(e.target.checked)} /> Print all N labels after save
         </label>
         {err && <p className="err">{err}</p>}
         <button className="btn" type="submit">
-          Receive into Quarantine
+          Receive {n} container{n === 1 ? '' : 's'} into Quarantine
         </button>
       </form>
     </div>

@@ -9,7 +9,7 @@ import type {
   SodRules,
   UserRecord,
 } from '../types';
-import { CAPABILITY_GROUPS, CAPABILITY_LABELS } from '../types';
+import { CAPABILITY_GROUPS, CAPABILITY_LABELS, DEFAULT_SOD } from '../types';
 import {
   cloneRows,
   createCustomRole,
@@ -350,7 +350,7 @@ function MatrixPanel({ session, canEdit }: { session: Session; canEdit: boolean 
   const [roles, setRoles] = useState<RoleRecord[]>([]);
   const [live, setLive] = useState<PermissionMatrixDocument | null>(null);
   const [rows, setRows] = useState<MatrixRows>({});
-  const [sod, setSod] = useState<SodRules>({ qaDispositionXorReceive: true, destroyRequiresESign: true, editMatrixXorQaDisposition: true });
+  const [sod, setSod] = useState<SodRules>({ ...DEFAULT_SOD });
   const [waiver, setWaiver] = useState('');
   const [ack, setAck] = useState(false);
   const [sign, setSign] = useState(false);
@@ -458,6 +458,10 @@ function MatrixPanel({ session, canEdit }: { session: Session; canEdit: boolean 
         <label className="row">
           <input type="checkbox" disabled={!canEdit} checked={sod.editMatrixXorQaDisposition} onChange={(e) => setSod({ ...sod, editMatrixXorQaDisposition: e.target.checked })} />
           editPermissionMatrix XOR qaDisposition
+        </label>
+        <label className="row">
+          <input type="checkbox" disabled={!canEdit} checked={sod.qaDispositionXorFulfill ?? true} onChange={(e) => setSod({ ...sod, qaDispositionXorFulfill: e.target.checked })} />
+          qaDisposition XOR fulfillRequest (QA does not pick/issue against requests)
         </label>
         {violations.length > 0 && (
           <div>

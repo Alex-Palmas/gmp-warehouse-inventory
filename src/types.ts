@@ -1,6 +1,6 @@
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 export const DOC_ID = 'DOC-WH-INV-001';
-export const DOC_VERSION = '1.1';
+export const DOC_VERSION = '1.2';
 export const VALIDATION_BANNER =
   'Not validated — do not use for GMP decisions until IQ/OQ/PQ approved.';
 export const SESSION_IDLE_MS = 15 * 60 * 1000;
@@ -32,6 +32,11 @@ export const CAPABILITIES = [
   'backupRestore',
   'exportReports',
   'eSign',
+  'submitMaterial',
+  'submitRequest',
+  'fulfillRequest',
+  'samplePull',
+  'viewInbox',
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -39,12 +44,17 @@ export const CAPABILITY_GROUPS: { id: string; label: string; caps: Capability[] 
   {
     id: 'view',
     label: 'View',
-    caps: ['viewDashboard', 'viewRegister', 'viewAudit', 'viewAccessLog', 'scanLookup'],
+    caps: ['viewDashboard', 'viewRegister', 'viewAudit', 'viewAccessLog', 'scanLookup', 'viewInbox'],
   },
   {
     id: 'inventory',
     label: 'Inventory',
     caps: ['receive', 'transfer', 'issue', 'returnToStock', 'cycleCount', 'reprintLabel'],
+  },
+  {
+    id: 'requests',
+    label: 'Requests & sampling',
+    caps: ['submitMaterial', 'submitRequest', 'fulfillRequest', 'samplePull'],
   },
   {
     id: 'qa',
@@ -79,6 +89,11 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   backupRestore: 'Backup / restore',
   exportReports: 'Export reports',
   eSign: 'Apply electronic signature',
+  submitMaterial: 'Submit new material',
+  submitRequest: 'Submit material request',
+  fulfillRequest: 'Pick / fulfill requests',
+  samplePull: 'Pull sample / retain',
+  viewInbox: 'View inbox',
 };
 
 /** Stable role IDs. Display names live on RoleRecord.name. */
@@ -89,6 +104,7 @@ export const SYSTEM_ROLE_IDS = [
   'qa',
   'qc',
   'readonly',
+  'requester',
 ] as const;
 export type SystemRoleId = (typeof SYSTEM_ROLE_IDS)[number];
 
@@ -116,12 +132,14 @@ export interface SodRules {
   qaDispositionXorReceive: boolean;
   destroyRequiresESign: boolean;
   editMatrixXorQaDisposition: boolean;
+  qaDispositionXorFulfill: boolean;
 }
 
 export const DEFAULT_SOD: SodRules = {
   qaDispositionXorReceive: true,
   destroyRequiresESign: true,
   editMatrixXorQaDisposition: true,
+  qaDispositionXorFulfill: true,
 };
 
 export type MatrixRows = Record<string, Record<Capability, boolean>>;
@@ -220,6 +238,26 @@ export type ContainerType = (typeof CONTAINER_TYPES)[number];
 export const QA_DISPOSITIONS = ['Release', 'Reject', 'Restricted'] as const;
 export type QaDisposition = (typeof QA_DISPOSITIONS)[number];
 
+export const RECORD_KINDS = ['container', 'sample', 'retain'] as const;
+export type RecordKind = (typeof RECORD_KINDS)[number];
+
+export const REQUEST_PRIORITIES = ['Routine', 'Urgent', 'STAT'] as const;
+export type RequestPriority = (typeof REQUEST_PRIORITIES)[number];
+
+export const REQUEST_STATUSES = [
+  'Submitted',
+  'Picking',
+  'Partially Issued',
+  'Issued',
+  'Closed',
+  'Cancelled',
+  'Rejected',
+] as const;
+export type RequestStatus = (typeof REQUEST_STATUSES)[number];
+
+export const SUBMISSION_STATUSES = ['Submitted', 'Approved', 'Rejected'] as const;
+export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
+
 export interface Location {
   site: string;
   building: string;
@@ -310,6 +348,13 @@ export interface InventoryRecord {
   samplingRequired: boolean;
   linkedSampleIds: string;
   comments: string;
+  receiptBatchId: string;
+  containerIndex: number;
+  qtyPerContainer: number;
+  parentSerial?: string;
+  recordKind: RecordKind;
+  reservedForRequestId?: string;
+  reservedQty?: number;
   createdBy: string;
   createdOnUtc: string;
   modifiedBy: string;
@@ -332,6 +377,7 @@ export interface Movement {
   performedOnUtc: string;
   reason: string;
   comments: string;
+  requestId?: string;
 }
 
 export interface AuditEntry {
@@ -389,4 +435,87 @@ export type AuditAction =
   | 'MATERIAL_UPDATE'
   | 'MATRIX_SAVE'
   | 'ROLE_CREATE'
-  | 'ROLE_UPDATE';
+  | 'ROLE_UPDATE'
+  | 'MATERIAL_SUBMIT'
+  | 'MATERIAL_APPROVE'
+  | 'MATERIAL_REJECT'
+  | 'REQUEST_SUBMIT'
+  | 'REQUEST_PICK'
+  | 'REQUEST_ISSUE'
+  | 'REQUEST_CANCEL'
+  | 'REQUEST_REJECT'
+  | 'REQUEST_CLOSE'
+  | 'REQUEST_RESERVE'
+  | 'SAMPLE_PULL';
+
+export interface PickedLine {
+  serial: string;
+  qty: number;
+}
+
+export interface MaterialRequest {
+  requestId: string;
+  materialCode: string;
+  materialName: string;
+  qtyRequested: number;
+  qtyIssued: number;
+  uom: Uom;
+  neededBy: string;
+  destination: string;
+  purpose: string;
+  priority: RequestPriority;
+  status: RequestStatus;
+  requestedBy: string;
+  requestedOnUtc: string;
+  fulfilledBy?: string;
+  fulfilledOnUtc?: string;
+  receivedBy?: string;
+  receivedOnUtc?: string;
+  pickedSerials: PickedLine[];
+  reservedSerials: PickedLine[];
+  rejectReason?: string;
+  comments: string;
+  stockWarning?: string;
+}
+
+export interface MaterialSubmission {
+  submissionId: string;
+  materialCode: string;
+  materialName: string;
+  itemType: ItemType;
+  gradeSpec: string;
+  pharmacopeia: Pharmacopeia;
+  defaultUom: Uom;
+  defaultStorage: StorageCondition;
+  samplingRequiredDefault: boolean;
+  manufacturerHint: string;
+  supplierHint: string;
+  justification: string;
+  status: SubmissionStatus;
+  submittedBy: string;
+  submittedOnUtc: string;
+  reviewedBy?: string;
+  reviewedOnUtc?: string;
+  rejectReason?: string;
+}
+
+export type InboxKind =
+  | 'request_submitted'
+  | 'request_issued'
+  | 'request_ready'
+  | 'material_approved'
+  | 'material_rejected'
+  | 'insufficient_stock'
+  | 'request_rejected'
+  | 'request_cancelled';
+
+export interface InboxMessage {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  kind: InboxKind;
+  relatedId: string;
+  createdOnUtc: string;
+  read: boolean;
+}

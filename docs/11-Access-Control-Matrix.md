@@ -1,10 +1,10 @@
-# Access Control Matrix — DOC-WH-INV-001 v1.1
+# Access Control Matrix — DOC-WH-INV-001 v1.2
 
 | Field | Value |
 |-------|-------|
 | Document | AC-WH-INV-001 |
-| Version | 1.1 (draft template) |
-| Related | DOC-WH-INV-001 v1.1 |
+| Version | 1.2 (draft template) |
+| Related | DOC-WH-INV-001 v1.2 |
 | Site | [SITE] |
 | Owner | [OWNER] |
 | Date | [DATE] |
@@ -26,9 +26,11 @@ The live matrix is **data** in IndexedDB (`meta.permissionMatrix`), not compiled
 
 ## 2. Capabilities (closed list)
 
-View: viewDashboard, viewRegister, viewAudit, viewAccessLog, scanLookup
+View: viewDashboard, viewRegister, viewAudit, viewAccessLog, scanLookup, viewInbox
 
 Inventory: receive, transfer, issue, returnToStock, cycleCount, reprintLabel
+
+Requests & sampling: submitMaterial, submitRequest, fulfillRequest, samplePull
 
 QA: hold, qaDisposition, destroy, eSign
 
@@ -43,7 +45,8 @@ Admin: adminMaterials, adminUsers, editPermissionMatrix, backupRestore, exportRe
 | operator | Warehouse Operator | receive, transfer, issue, returnToStock, cycleCount, reprintLabel, scanLookup, viewDashboard, viewRegister. **Not** hold, QA, destroy, user admin, matrix. |
 | qa | QA | qaDisposition, destroy, hold, adminMaterials, eSign, reprint, view all, export, backup. **Not** receive / issue / transfer (SoD). |
 | qc | QC | viewDashboard, viewRegister, scanLookup, cycleCount, reprintLabel. |
-| readonly | Read-Only | viewDashboard, viewRegister, scanLookup, viewAudit. No mutations. |
+| readonly | Read-Only | viewDashboard, viewRegister, scanLookup, viewAudit, viewInbox. No mutations. |
+| requester | Requester / Lab-Production | submitMaterial, submitRequest, viewDashboard, viewRegister, scanLookup, viewInbox. **Not** receive / fulfillRequest / qaDisposition. |
 
 Custom roles (e.g. Shipping, Night Shift) may be added by a matrix editor. They cannot reuse a system role ID. Custom roles may be deactivated only when no users remain assigned.
 
@@ -54,6 +57,7 @@ Configurable rules stored with the matrix. **Defaults ON.** Violations **block s
 1. **qaDisposition XOR receive** on the same role. Default QA role therefore cannot receive/issue/transfer. Intended path: receive as `wh`, release as `qa`.
 2. **destroy requires eSign**.
 3. **editPermissionMatrix XOR qaDisposition** on the same role.
+4. **qaDisposition XOR fulfillRequest** on the same role (QA does not pick/issue against requests).
 4. **Own-receipt:** a user cannot e-sign a disposition on a record they created (`createdBy === session.userId`), even if the role has both capabilities. Enforced in QA disposition.
 
 Lockout prevention (always enforced, not waivable): at least one role must retain `editPermissionMatrix`; at least one role must retain `adminUsers`.

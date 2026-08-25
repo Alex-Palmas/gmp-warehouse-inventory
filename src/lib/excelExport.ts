@@ -14,6 +14,8 @@ import { listAudit } from './audit';
 import { isAccountLocked, listAccessLog, listUsers } from './auth';
 import { nowUtcIso, toDisplayLocal, locationToString } from './dates';
 import { assertCapability, getLiveMatrix, listRoles } from './permissions';
+import { listRequests } from './requests';
+import { listSubmissions } from './submissions';
 
 function footer(ws: ExcelJS.Worksheet, exportedBy: string, n: number): void {
   const r = n + 2;
@@ -46,6 +48,11 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
 
   const invHeaders = [
     'Serial',
+    'Receipt Batch',
+    'Container Index',
+    'Record Kind',
+    'Parent Serial',
+    'Container Type',
     'Material Code',
     'Material Name',
     'Item Type',
@@ -53,6 +60,7 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
     'Internal Lot',
     'Mfr Lot',
     'Qty Received',
+    'Qty Per Container',
     'Current Qty',
     'UOM',
     'Expiry',
@@ -68,6 +76,11 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
   for (const r of inv) {
     ws1.addRow([
       r.serial,
+      r.receiptBatchId ?? '',
+      r.containerIndex ?? '',
+      r.recordKind ?? 'container',
+      r.parentSerial ?? '',
+      r.containerType,
       r.materialCode,
       r.materialName,
       r.itemType,
@@ -75,6 +88,7 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
       r.internalLot,
       r.manufacturerLot,
       r.currentQty === undefined ? '' : r.qtyReceived,
+      r.qtyPerContainer ?? '',
       r.currentQty,
       r.uom,
       r.expiryDate,
@@ -109,7 +123,7 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
   footer(ws2, session.userId, mats.length + 1);
 
   const ws3 = wb.addWorksheet('Movement Log');
-  const mvh = ['ID', 'Serial', 'Action', 'Qty', 'From', 'To', 'By', 'On UTC', 'Reason', 'Comments'];
+  const mvh = ['ID', 'Serial', 'Action', 'Qty', 'From', 'To', 'By', 'On UTC', 'Reason', 'Comments', 'Request ID'];
   ws3.addRow(mvh);
   for (const m of mov) {
     ws3.addRow([
@@ -123,6 +137,7 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
       m.performedOnUtc,
       m.reason,
       m.comments,
+      m.requestId ?? '',
     ]);
   }
   styleHeader(ws3, mvh.length);
@@ -171,6 +186,85 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
   }
   styleHeader(ws5, uh.length);
   footer(ws5, session.userId, acc.length + 1);
+
+  const reqs = await listRequests();
+  const subs = await listSubmissions();
+
+  const wsReq = wb.addWorksheet('Request Log');
+  const reqh = [
+    'Request ID',
+    'Status',
+    'Material',
+    'Name',
+    'Qty Requested',
+    'Qty Issued',
+    'UOM',
+    'Needed By',
+    'Destination',
+    'Purpose',
+    'Priority',
+    'Requested By',
+    'Requested On UTC',
+    'Fulfilled By',
+    'Stock Warning',
+  ];
+  wsReq.addRow(reqh);
+  for (const r of reqs) {
+    wsReq.addRow([
+      r.requestId,
+      r.status,
+      r.materialCode,
+      r.materialName,
+      r.qtyRequested,
+      r.qtyIssued,
+      r.uom,
+      r.neededBy,
+      r.destination,
+      r.purpose,
+      r.priority,
+      r.requestedBy,
+      r.requestedOnUtc,
+      r.fulfilledBy ?? '',
+      r.stockWarning ?? '',
+    ]);
+  }
+  styleHeader(wsReq, reqh.length);
+  footer(wsReq, session.userId, reqs.length + 1);
+
+  const wsSub = wb.addWorksheet('Material Submissions');
+  const subh = [
+    'Submission ID',
+    'Status',
+    'Code',
+    'Name',
+    'Type',
+    'Grade',
+    'UOM',
+    'Justification',
+    'Submitted By',
+    'Submitted On UTC',
+    'Reviewed By',
+    'Reject Reason',
+  ];
+  wsSub.addRow(subh);
+  for (const s of subs) {
+    wsSub.addRow([
+      s.submissionId,
+      s.status,
+      s.materialCode,
+      s.materialName,
+      s.itemType,
+      s.gradeSpec,
+      s.defaultUom,
+      s.justification,
+      s.submittedBy,
+      s.submittedOnUtc,
+      s.reviewedBy ?? '',
+      s.rejectReason ?? '',
+    ]);
+  }
+  styleHeader(wsSub, subh.length);
+  footer(wsSub, session.userId, subs.length + 1);
 
   const roles = await listRoles();
   const matrix = await getLiveMatrix();

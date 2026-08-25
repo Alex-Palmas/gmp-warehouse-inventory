@@ -40,6 +40,13 @@ describe('default permission matrix', () => {
     expect(defaultAllows('qc', 'qaDisposition')).toBe(false);
     expect(defaultAllows('supervisor', 'editPermissionMatrix')).toBe(false);
     expect(defaultAllows('supervisor', 'adminUsers')).toBe(true);
+    expect(defaultAllows('requester', 'submitRequest')).toBe(true);
+    expect(defaultAllows('requester', 'submitMaterial')).toBe(true);
+    expect(defaultAllows('requester', 'fulfillRequest')).toBe(false);
+    expect(defaultAllows('requester', 'receive')).toBe(false);
+    expect(defaultAllows('qa', 'fulfillRequest')).toBe(false);
+    expect(defaultAllows('operator', 'fulfillRequest')).toBe(true);
+    expect(defaultAllows('readonly', 'viewInbox')).toBe(true);
   });
 
   it('hasCapability reads matrix not hardcoded role names', async () => {

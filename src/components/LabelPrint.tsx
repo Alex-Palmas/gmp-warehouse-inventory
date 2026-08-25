@@ -7,7 +7,7 @@ import { locationToString } from '../lib/dates';
 export function LabelCanvases({ rec, size }: { rec: InventoryRecord; size: '2x1' | '4x2' }) {
   const barRef = useRef<SVGSVGElement>(null);
   const qrRef = useRef<HTMLCanvasElement>(null);
-  const payload = `${rec.serial}|${rec.internalLot}|${rec.expiryDate}|${rec.status}`;
+  const payload = `${rec.serial}|${rec.internalLot}|${rec.expiryDate}|${rec.status}|${rec.containerType}`;
 
   useEffect(() => {
     if (barRef.current) {
@@ -52,8 +52,15 @@ export function LabelCanvases({ rec, size }: { rec: InventoryRecord; size: '2x1'
         </div>
         <div>Lot {rec.internalLot} · Exp {rec.expiryDate}</div>
         <div>
-          {rec.status} · {rec.storageCondition}
+          {rec.status} · {rec.containerType}
+          {rec.containerIndex && rec.numberOfContainers
+            ? ` ${rec.containerIndex}/${rec.numberOfContainers}`
+            : ''}{' '}
+          · {rec.storageCondition}
         </div>
+        {rec.receiptBatchId && rec.receiptBatchId !== rec.serial && (
+          <div>Batch {rec.receiptBatchId}</div>
+        )}
         <div>{locationToString(rec.location)}</div>
         <svg ref={barRef} />
       </div>

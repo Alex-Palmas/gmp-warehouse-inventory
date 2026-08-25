@@ -31,3 +31,40 @@ export function assertSerialUnique(serial: string, existing: Iterable<string>): 
     if (s === serial) throw new Error(`Serial ${serial} already allocated and must never be reused`);
   }
 }
+
+const BATCH_RE = /^RCV-(\d{4})-(\d{6})$/;
+const REQUEST_RE = /^MR-(\d{4})-(\d{6})$/;
+
+export function formatReceiptBatchId(year: number, n: number): string {
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) throw new Error('Invalid receipt batch year');
+  if (!Number.isInteger(n) || n < 1 || n > 999999) throw new Error('Invalid receipt batch sequence');
+  return `RCV-${year}-${String(n).padStart(6, '0')}`;
+}
+
+export function formatRequestId(year: number, n: number): string {
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) throw new Error('Invalid request year');
+  if (!Number.isInteger(n) || n < 1 || n > 999999) throw new Error('Invalid request sequence');
+  return `MR-${year}-${String(n).padStart(6, '0')}`;
+}
+
+export function formatSubmissionId(year: number, n: number): string {
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) throw new Error('Invalid submission year');
+  if (!Number.isInteger(n) || n < 1 || n > 999999) throw new Error('Invalid submission sequence');
+  return `SUB-${year}-${String(n).padStart(6, '0')}`;
+}
+
+export function isValidReceiptBatchId(id: string): boolean {
+  return BATCH_RE.test(id);
+}
+
+export function isValidRequestId(id: string): boolean {
+  return REQUEST_RE.test(id);
+}
+
+/** HID / QR payload may be serial or serial|lot|expiry|status|containerType */
+export function parseScanPayload(raw: string): string {
+  const s = raw.trim();
+  if (!s) return '';
+  if (s.includes('|')) return s.split('|')[0].trim();
+  return s;
+}
