@@ -4,10 +4,13 @@ import { FLASH_EVENT } from '../lib/scanFeedback';
 import type { Capability, Session } from '../types';
 import { DOC_ID, DOC_VERSION, VALIDATION_BANNER, APP_VERSION } from '../types';
 import { ScanBox } from './ScanBox';
+import { ThemeToggle } from './ThemeToggle';
 import { logout } from '../lib/auth';
 import { toDisplayLocal } from '../lib/dates';
 import { useCaps } from '../hooks/useCap';
 import { unreadInboxCount } from '../lib/inbox';
+
+const PRIMARY = new Set(['/', '/register', '/inbox', '/receive', '/qa', '/audit', '/access']);
 
 const NAV: { to: string; label: string; cap: Capability }[] = [
   { to: '/', label: 'Dashboard', cap: 'viewDashboard' },
@@ -76,6 +79,9 @@ export function Layout({ session, onLogout }: { session: Session; onLogout: () =
     if (item.to === '/requests') return caps.has('submitRequest') || caps.has('fulfillRequest');
     return caps.has(item.cap);
   };
+  const visible = NAV.filter(show);
+  const primary = visible.filter((i) => PRIMARY.has(i.to));
+  const more = visible.filter((i) => !PRIMARY.has(i.to));
   return (
     <div>
       <div className="banner">
@@ -84,15 +90,28 @@ export function Layout({ session, onLogout }: { session: Session; onLogout: () =
       <header className="header no-print">
         <div className="brand">WH-INV</div>
         <nav className="nav">
-          {NAV.filter(show).map((item) => (
+          {primary.map((item) => (
             <span key={item.to}>{link(item.to, item.label, item.to === '/inbox' ? unread : 0)}</span>
           ))}
+          {more.length > 0 && (
+            <details className="nav-more">
+              <summary>More</summary>
+              <div className="nav-more-menu" onClick={(e) => {
+                  const d = (e.currentTarget as HTMLElement).closest('details');
+                  if (d) d.removeAttribute('open');
+                }}>
+                {more.map((item) => (
+                  <span key={item.to}>{link(item.to, item.label, item.to === '/inbox' ? unread : 0)}</span>
+                ))}
+              </div>
+            </details>
+          )}
         </nav>
         <div className="userbox">
-          <div>
+          <ThemeToggle />
+          <div className="who">
             {session.fullName} ({session.userId})
-          </div>
-          <div>
+            <br />
             {session.roleName || session.role} · {toDisplayLocal(session.lastActivityUtc)}
           </div>
           <button className="btn btn-sec" type="button" onClick={doLogout}>

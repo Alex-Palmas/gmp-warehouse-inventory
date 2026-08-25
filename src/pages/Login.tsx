@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { DOC_ID, DOC_VERSION, VALIDATION_BANNER, type Session } from '../types';
 import { login } from '../lib/auth';
 
@@ -22,9 +23,12 @@ export function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   }
 
   return (
-    <div>
+    <div className="login-shell">
       <div className="banner">VALIDATION STATUS: {VALIDATION_BANNER}</div>
-      <div className="page" style={{ maxWidth: 420 }}>
+      <div className="login-top">
+        <ThemeToggle />
+      </div>
+      <div className="page login-card">
         <div className="card">
           <h1>GMP Warehouse Inventory</h1>
           <p className="help">

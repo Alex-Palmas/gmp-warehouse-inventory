@@ -415,7 +415,7 @@ function MatrixPanel({ session, canEdit }: { session: Session; canEdit: boolean 
               {visibleRoles.map((r) => (
                 <th key={r.roleId} title={r.description}>
                   {r.name}
-                  <div className="help" style={{ color: '#bee3f8' }}>
+                  <div className="help">
                     {r.roleId}
                     {r.system ? ' · system' : ''}
                   </div>
