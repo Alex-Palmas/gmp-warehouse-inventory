@@ -5,7 +5,7 @@ Standalone **system of record** for warehouse containers in a pharmaceutical / b
 
 This application is a technical control set that *can support* 21 CFR Part 11, 21 CFR 211 warehouse/records, EU GMP Annex 11, ALCOA+, and GAMP 5 **after** the site executes IQ/OQ/PQ, trains users, and adopts SOPs. It is **not** certified, validated, or fully compliant as shipped.
 
-Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.4.0`
+Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.4.1`
 
 ## Intended use
 
@@ -59,7 +59,10 @@ Demo accounts are seeded on first launch. **Passwords are documented here only. 
 | wh | Warehouse Operator | Wh123! |
 | ro | Read-Only | Ro123! |
 | lab | Requester / Lab-Production | LabUser123!x |
+| val | Validation | Val123!xx |
 | super | Presentation Superuser | Super123!xx |
+
+`val` (Validation) may view the register/audit and run the in-app **OQ/PQ-style sandbox protocol with screenshot evidence**. Log in as `val` / `Val123!xx`. The run uses a separate IndexedDB (`gmp-wh-inv-oq`), captures barcode/UI proof images, and downloads a PDF (`WH-INV-OQ-PQ-evidence-{date}.pdf`). It must not touch production lots and is **automated sandbox evidence only** — not approved IQ/OQ/PQ and not a vendor Part 11 certificate. Live lots were not used.
 
 `super` is a **presentation / walkthrough** account: every matrix capability, first-login password change skipped, and SoD (including own-receipt) waived for that role only. A **View as** control in the header simulates any seeded access level (nav, workstrip, and page guards follow that role). Do not use it for GMP.
 
@@ -142,6 +145,7 @@ Templates with `[SITE]`, `[OWNER]`, `[DATE]` placeholders — **not pre-approved
 | QC | View, scan, cycle count, reprint. |
 | Read-Only | View dashboard, register, scan, audit, inbox. No mutations. |
 | Requester / Lab-Production | Submit material, submit request, confirm received, view, inbox. Not warehouse pick/receive/QA disposition. |
+| Validation | View register/audit, export reports, backup, run sandbox self-validation / OQ evidence. Not receive/issue/QA/fulfill/matrix/user admin (SoD). |
 
 Admins may add custom roles. System roles cannot be deleted. Users cannot be deleted — only deactivated.
 

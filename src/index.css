@@ -549,3 +549,16 @@ html[data-theme="dark"] .attach-receipt { background: var(--surface-2); border-c
   .mtf-print { display: block; color: #000; background: #fff; box-shadow: none; border-color: #000; }
   .mtf-print h2 { border-bottom-color: #000; }
 }
+
+.oq-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.oq-chip-Pass { background: var(--ok-soft); color: var(--ok); }
+.oq-chip-Fail { background: var(--danger-soft); color: var(--danger); }
+.oq-chip-Manual { background: var(--warn-soft); color: var(--warn); }
+tr.oq-fail td { background: var(--danger-soft); }
+tr.oq-manual td { background: var(--warn-soft); }
+tr.oq-pass td { background: var(--ok-soft); }
+@media print {
+  .oq-actions { display: none !important; }
+  .oq-print { color: #000; background: #fff; }
+  .oq-print table { font-size: 11px; }
+}

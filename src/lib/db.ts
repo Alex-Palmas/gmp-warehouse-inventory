@@ -16,14 +16,20 @@ import type {
   UserRecord,
 } from '../types';
 
-const DB_NAME = 'gmp-wh-inv';
+export const PROD_DB_NAME = 'gmp-wh-inv';
+export const OQ_DB_NAME = 'gmp-wh-inv-oq';
 const DB_VERSION = 4;
 
 let _db: IDBPDatabase | null = null;
+let _dbName: string = PROD_DB_NAME;
+
+export function currentDbName(): string {
+  return _dbName;
+}
 
 export async function getDb(): Promise<IDBPDatabase> {
   if (_db) return _db;
-  _db = await openDB(DB_NAME, DB_VERSION, {
+  _db = await openDB(currentDbName(), DB_VERSION, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('users')) db.createObjectStore('users', { keyPath: 'userId' });
       if (!db.objectStoreNames.contains('materials'))
@@ -57,6 +63,38 @@ export async function resetDbConnection(): Promise<void> {
   if (_db) {
     _db.close();
     _db = null;
+  }
+}
+
+export async function deleteDatabase(name: string): Promise<void> {
+  if (_db && _dbName === name) {
+    await resetDbConnection();
+  }
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(name);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error ?? new Error(`deleteDatabase(${name}) failed`));
+    req.onblocked = () => resolve();
+  });
+}
+
+/**
+ * Run fn against a named IndexedDB. Always restores the previous database name
+ * (production by default) and drops the in-memory connection + matrix cache,
+ * even if fn throws. Self-validation MUST use withDatabase(OQ_DB_NAME, ...).
+ */
+export async function withDatabase<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const { setMatrixCacheForTests } = await import('./permissions');
+  const previous = _dbName;
+  _dbName = name;
+  await resetDbConnection();
+  setMatrixCacheForTests(null);
+  try {
+    return await fn();
+  } finally {
+    _dbName = previous;
+    await resetDbConnection();
+    setMatrixCacheForTests(null);
   }
 }
 

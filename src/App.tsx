@@ -29,6 +29,7 @@ import { Requests } from './pages/Requests';
 import { SubmitMaterial } from './pages/SubmitMaterial';
 import { Inbox } from './pages/Inbox';
 import { Samples } from './pages/Samples';
+import { ValidationPage } from './pages/Validation';
 
 function Guard({
   session,
@@ -310,6 +311,14 @@ export default function App() {
           element={
             <CapRoute session={effective} cap="viewAudit">
               <AuditTrail session={effective} />
+            </CapRoute>
+          }
+        />
+        <Route
+          path="validation"
+          element={
+            <CapRoute session={effective} cap="runValidation">
+              <ValidationPage session={effective} />
             </CapRoute>
           }
         />

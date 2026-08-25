@@ -1,7 +1,7 @@
 {
   "name": "gmp-warehouse-inventory",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "description": "GMP warehouse inventory system of record (not validated as shipped)",
   "scripts": {
@@ -12,8 +12,11 @@
   },
   "dependencies": {
     "exceljs": "^4.4.0",
+    "html2canvas": "^1.4.1",
     "idb": "^8.0.2",
     "jsbarcode": "^3.11.6",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -27,6 +27,7 @@ const DEMO_USERS: {
   { userId: 'wh', fullName: 'Sam Operator', role: 'operator', password: 'Wh123!' },
   { userId: 'ro', fullName: 'Riley ReadOnly', role: 'readonly', password: 'Ro123!' },
   { userId: 'lab', fullName: 'Lee Lab Requester', role: 'requester', password: 'LabUser123!x' },
+  { userId: 'val', fullName: 'Taylor Validation', role: 'validation', password: 'Val123!xx' },
   {
     userId: 'super',
     fullName: 'Presentation Superuser',

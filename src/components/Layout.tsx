@@ -33,6 +33,7 @@ const NAV: { to: string; label: string; cap: Capability }[] = [
   { to: '/materials', label: 'Materials', cap: 'adminMaterials' },
   { to: '/access', label: 'Access', cap: 'adminUsers' },
   { to: '/audit', label: 'Audit', cap: 'viewAudit' },
+  { to: '/validation', label: 'Validation', cap: 'runValidation' },
 ];
 
 export function Layout({

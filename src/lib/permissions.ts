@@ -93,6 +93,13 @@ export const DEFAULT_ROLES: RoleRecord[] = [
     active: true,
   },
   {
+    roleId: 'validation',
+    name: 'Validation',
+    description: 'CSV/OQ evidence. View + run sandbox self-validation. Not a warehouse or QA actor (SoD).',
+    system: true,
+    active: true,
+  },
+  {
     roleId: PRESENTATION_ROLE_ID,
     name: 'Presentation Superuser',
     description: 'Demo / walkthrough only. Every capability. Matrix SoD and own-receipt SoD are waived for this role. Not for GMP use.',
@@ -121,6 +128,7 @@ export function defaultMatrixRows(): MatrixRows {
       'resetUserPassword',
       'createRole',
       'exportAudit',
+      'runValidation',
     ]),
     supervisor: allowCaps([
       'viewDashboard',
@@ -215,6 +223,18 @@ export function defaultMatrixRows(): MatrixRows {
       'submitRequest',
       'cancelRequest',
       'confirmRequestReceipt',
+    ]),
+    validation: allowCaps([
+      'viewDashboard',
+      'viewRegister',
+      'viewAudit',
+      'viewAccessLog',
+      'scanLookup',
+      'viewInbox',
+      'exportReports',
+      'exportAudit',
+      'backupRestore',
+      'runValidation',
     ]),
     super: allowCaps([...CAPABILITIES]),
   };

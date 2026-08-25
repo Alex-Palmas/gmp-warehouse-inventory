@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.4.1';
 export const DOC_ID = 'DOC-WH-INV-001';
 export const DOC_VERSION = '1.3';
 export const VALIDATION_BANNER =
@@ -47,6 +47,7 @@ export const CAPABILITIES = [
   'resetUserPassword',
   'createRole',
   'exportAudit',
+  'runValidation',
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -96,6 +97,11 @@ export const CAPABILITY_GROUPS: { id: string; label: string; caps: Capability[] 
       'exportReports',
     ],
   },
+  {
+    id: 'validation',
+    label: 'Validation',
+    caps: ['runValidation'],
+  },
 ];
 
 export const CAPABILITY_LABELS: Record<Capability, string> = {
@@ -134,6 +140,7 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   resetUserPassword: 'Reset user password',
   createRole: 'Create custom role',
   exportAudit: 'Export audit trail',
+  runValidation: 'Run self-validation / OQ evidence',
 };
 
 /** Stable role IDs. Display names live on RoleRecord.name. */
@@ -148,6 +155,7 @@ export const SYSTEM_ROLE_IDS = [
   'readonly',
   'requester',
   'super',
+  'validation',
 ] as const;
 export type SystemRoleId = (typeof SYSTEM_ROLE_IDS)[number];
 
@@ -526,7 +534,8 @@ export type AuditAction =
   | 'REQUEST_UNPICK'
   | 'ATTACHMENT_ADD'
   | 'REQUEST_SUPERVISOR_APPROVE'
-  | 'REQUEST_QA_APPROVE';
+  | 'REQUEST_QA_APPROVE'
+  | 'VALIDATION_RUN';
 
 export interface PickedLine {
   serial: string;

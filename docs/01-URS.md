@@ -56,6 +56,7 @@ Each URS ID must be traced in the matrix (doc 04) and tested in OQ (doc 06).
 | URS-27 | Dashboard KPI counts are clickable and filter the register / request queue | — | 211.142 | 11.6 | Available |
 | URS-28 | Optional CoA/certificate attachments per serial and receipt batch; append-only; IndexedDB is not a DMS | 11.10(b)(e) | 211.80; 211.184 | 11.7 | Complete, Enduring |
 | URS-29 | Material Transfer e-sign workflow (requestor → supervisor → QA when cell bank/quarantine → warehouse issue → receiver qty received); FEFO reserve on Approved | 11.10(g); 11.50 | 211.150; 211.80(d) | 11.12, 11.14 | Attributable |
+| URS-30 | Validation role may run in-app sandbox self-validation that executes an automated OQ protocol against a separate IndexedDB and exports evidence. Not a substitute for executed IQ/OQ/PQ; must not touch production lots; app remains not validated as shipped. | 11.10(k) documentation | — | 11.4 | Available |
 
 **211.80–211.94** (receipt, storage, testing, rejected, retesting) are covered by URS-02, 04, 11, 12, 13. **211.142** warehousing by URS-11, 12, 17. **211.150** distribution/FEFO by URS-05. **211.180** record retention by URS-03, 06, 15. **211.204** returned goods by Return-to-stock form (URS-10/03).
 
