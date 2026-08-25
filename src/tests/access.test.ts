@@ -49,6 +49,18 @@ describe('default permission matrix', () => {
     expect(defaultAllows('readonly', 'viewInbox')).toBe(true);
   });
 
+  it('presentation super role has every capability and is exempt from matrix SoD', async () => {
+    const { CAPABILITIES } = await import('../types');
+    for (const cap of CAPABILITIES) {
+      expect(defaultAllows('super', cap)).toBe(true);
+    }
+    const v = evaluateSod(defaultMatrixRows(), DEFAULT_SOD);
+    expect(v.filter((x) => x.roleId === 'super')).toEqual([]);
+    expect(await hasCapability(session('super'), 'receive')).toBe(true);
+    expect(await hasCapability(session('super'), 'qaDisposition')).toBe(true);
+    expect(await hasCapability(session('super'), 'editPermissionMatrix')).toBe(true);
+  });
+
   it('hasCapability reads matrix not hardcoded role names', async () => {
     expect(await hasCapability(session('operator'), 'receive')).toBe(true);
     expect(await hasCapability(session('operator'), 'qaDisposition')).toBe(false);
@@ -92,6 +104,7 @@ describe('own-receipt SoD', () => {
   it('user cannot e-sign disposition on record they received', () => {
     expect(() => assertNotOwnReceipt('wh', 'wh')).toThrow(/cannot e-sign/i);
     expect(() => assertNotOwnReceipt('qa', 'wh')).not.toThrow();
+    expect(() => assertNotOwnReceipt('super', 'super', 'super')).not.toThrow();
   });
 });
 

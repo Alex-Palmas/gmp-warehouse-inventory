@@ -301,7 +301,7 @@ export async function qaDisposition(
   if (esign.userId !== session.userId) throw new Error('Signature user must match session');
   const rec = await getInventory(serial);
   if (!rec) throw new Error('Record not found');
-  assertNotOwnReceipt(session.userId, rec.createdBy);
+  assertNotOwnReceipt(session.userId, rec.createdBy, session.role);
   const targets: InventoryRecord[] = [];
   if (scope === 'container') {
     targets.push(rec);
@@ -332,7 +332,7 @@ export async function qaDisposition(
     if (t.status === 'Destroyed' || t.status === 'Issued' || t.status === 'Consumed') {
       throw new Error(`Cannot disposition a ${t.status} container (${t.serial})`);
     }
-    assertNotOwnReceipt(session.userId, t.createdBy);
+    assertNotOwnReceipt(session.userId, t.createdBy, session.role);
     const old = t.status;
     t.status = newStatus;
     t.qaDisposition = disposition;

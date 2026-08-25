@@ -47,6 +47,7 @@ Admin: adminMaterials, adminUsers, editPermissionMatrix, backupRestore, exportRe
 | qc | QC | viewDashboard, viewRegister, scanLookup, cycleCount, reprintLabel. |
 | readonly | Read-Only | viewDashboard, viewRegister, scanLookup, viewAudit, viewInbox. No mutations. |
 | requester | Requester / Lab-Production | submitMaterial, submitRequest, viewDashboard, viewRegister, scanLookup, viewInbox. **Not** receive / fulfillRequest / qaDisposition. |
+| super | Presentation Superuser | **All capabilities.** Demo / walkthrough only. Matrix SoD and own-receipt SoD are waived for this role. Not for GMP use. Seeded user `super` / `Super123!xx` (no first-login password change). |
 
 Custom roles (e.g. Shipping, Night Shift) may be added by a matrix editor. They cannot reuse a system role ID. Custom roles may be deactivated only when no users remain assigned.
 

@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.3.1';
+export const APP_VERSION = '1.3.2';
 export const DOC_ID = 'DOC-WH-INV-001';
 export const DOC_VERSION = '1.3';
 export const VALIDATION_BANNER =
@@ -134,6 +134,8 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
 };
 
 /** Stable role IDs. Display names live on RoleRecord.name. */
+export const PRESENTATION_ROLE_ID = 'super';
+
 export const SYSTEM_ROLE_IDS = [
   'sysadmin',
   'supervisor',
@@ -142,6 +144,7 @@ export const SYSTEM_ROLE_IDS = [
   'qc',
   'readonly',
   'requester',
+  'super',
 ] as const;
 export type SystemRoleId = (typeof SYSTEM_ROLE_IDS)[number];
 

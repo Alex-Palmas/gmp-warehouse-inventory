@@ -13,7 +13,13 @@ import { DEFAULT_ROLES, buildDefaultMatrixDocument, hydrateMatrixDocument, resol
 const DEMO_SALT = 'gmp-demo-salt-v1';
 
 /** Demo passwords exist only to seed the local app. Documented in README. Production MUST change. */
-const DEMO_USERS: { userId: string; fullName: string; role: string; password: string }[] = [
+const DEMO_USERS: {
+  userId: string;
+  fullName: string;
+  role: string;
+  password: string;
+  mustChangePassword?: boolean;
+}[] = [
   { userId: 'sysadmin', fullName: 'Casey SysAdmin', role: 'sysadmin', password: 'Sysadmin123!' },
   { userId: 'admin', fullName: 'Alex Supervisor', role: 'supervisor', password: 'Admin123!' },
   { userId: 'qa', fullName: 'Jordan QA', role: 'qa', password: 'Qa123!' },
@@ -21,6 +27,13 @@ const DEMO_USERS: { userId: string; fullName: string; role: string; password: st
   { userId: 'wh', fullName: 'Sam Operator', role: 'operator', password: 'Wh123!' },
   { userId: 'ro', fullName: 'Riley ReadOnly', role: 'readonly', password: 'Ro123!' },
   { userId: 'lab', fullName: 'Lee Lab Requester', role: 'requester', password: 'LabUser123!x' },
+  {
+    userId: 'super',
+    fullName: 'Presentation Superuser',
+    role: 'super',
+    password: 'Super123!xx',
+    mustChangePassword: false,
+  },
 ];
 
 const MATERIALS: Omit<Material, 'createdBy' | 'createdOnUtc' | 'modifiedBy' | 'modifiedOnUtc'>[] = [
@@ -204,6 +217,7 @@ async function seedAccessControl(): Promise<void> {
   }
   for (const u of DEMO_USERS) {
     if (await db.get('users', u.userId)) continue;
+    const skipChange = u.mustChangePassword === false;
     const rec: UserRecord = {
       userId: u.userId,
       fullName: u.fullName,
@@ -212,10 +226,11 @@ async function seedAccessControl(): Promise<void> {
       passwordHash: await hashPasswordSha256Salt(u.password, DEMO_SALT),
       algorithm: 'sha256-salt',
       active: true,
-      mustChangePassword: true,
+      mustChangePassword: !skipChange,
       createdOnUtc: utc,
       failedAttempts: 0,
       passwordHistory: [],
+      passwordChangedUtc: skipChange ? nowUtcIso() : undefined,
     };
     await db.put('users', rec);
   }
@@ -256,6 +271,7 @@ export async function ensureSeeded(): Promise<void> {
   const utc = '2026-01-15T16:00:00.000Z';
   for (const u of DEMO_USERS) {
     if (await db.get('users', u.userId)) continue;
+    const skipChange = u.mustChangePassword === false;
     const rec: UserRecord = {
       userId: u.userId,
       fullName: u.fullName,
@@ -264,10 +280,11 @@ export async function ensureSeeded(): Promise<void> {
       passwordHash: await hashPasswordSha256Salt(u.password, DEMO_SALT),
       algorithm: 'sha256-salt',
       active: true,
-      mustChangePassword: true,
+      mustChangePassword: !skipChange,
       createdOnUtc: utc,
       failedAttempts: 0,
       passwordHistory: [],
+      passwordChangedUtc: skipChange ? nowUtcIso() : undefined,
     };
     await db.put('users', rec);
   }

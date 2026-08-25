@@ -17,6 +17,7 @@ import {
   CAPABILITIES,
   DEFAULT_SOD,
   LEGACY_ROLE_MAP,
+  PRESENTATION_ROLE_ID,
   SYSTEM_ROLE_IDS,
 } from '../types';
 import { getDb } from './db';
@@ -88,6 +89,13 @@ export const DEFAULT_ROLES: RoleRecord[] = [
     roleId: 'requester',
     name: 'Requester / Lab-Production',
     description: 'Submit material requests and new-material proposals. Confirm receipt. No warehouse pick/issue/QA disposition.',
+    system: true,
+    active: true,
+  },
+  {
+    roleId: PRESENTATION_ROLE_ID,
+    name: 'Presentation Superuser',
+    description: 'Demo / walkthrough only. Every capability. Matrix SoD and own-receipt SoD are waived for this role. Not for GMP use.',
     system: true,
     active: true,
   },
@@ -207,6 +215,7 @@ export function defaultMatrixRows(): MatrixRows {
       'cancelRequest',
       'confirmRequestReceipt',
     ]),
+    super: allowCaps([...CAPABILITIES]),
   };
 }
 
@@ -244,6 +253,7 @@ export function evaluateSod(rows: MatrixRows, sod: SodRules): SodViolation[] {
   for (const roleId of Object.keys(rows)) {
     const r = rows[roleId];
     if (!r) continue;
+    if (roleId === PRESENTATION_ROLE_ID) continue;
     if (sod.qaDispositionXorReceive && r.qaDisposition && r.receive) {
       violations.push({
         roleId,
@@ -377,7 +387,8 @@ export function qaStatusFromDisposition(d: 'Release' | 'Reject' | 'Restricted') 
 }
 
 /** Own-receipt SoD: a user cannot e-sign disposition on a record they created. */
-export function assertNotOwnReceipt(userId: string, createdBy: string): void {
+export function assertNotOwnReceipt(userId: string, createdBy: string, roleId?: string): void {
+  if (roleId === PRESENTATION_ROLE_ID || userId === PRESENTATION_ROLE_ID) return;
   if (userId && createdBy && userId === createdBy) {
     throw new Error(
       'Segregation of duties: you cannot e-sign a QA disposition on a container you received.',
