@@ -396,9 +396,9 @@ export async function runOqPqExtra(ctx: ExtraCtx): Promise<void> {
     'OQ-29',
     'URS-07',
     'SESSION_TIMEOUT audit on idle logout API',
-    'logout(..., SESSION_TIMEOUT) writes SESSION_TIMEOUT; idle is 15 min.',
+    'logout(..., SESSION_TIMEOUT, { keepBrowserSession: true }) writes SESSION_TIMEOUT; idle is 15 min; does not clear the live tab session.',
     async () => {
-      await logout(op, 'SESSION_TIMEOUT');
+      await logout(op, 'SESSION_TIMEOUT', { keepBrowserSession: true });
       const rows = await listAudit();
       const hit = rows.some((a) => a.action === 'SESSION_TIMEOUT' && a.recordId === op.userId);
       return {

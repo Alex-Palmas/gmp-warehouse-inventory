@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { addAttachment, listForSerial } from './attachments';
 import { appendAudit, AUDIT_MUTATION_API, listAudit } from './audit';
-import { applyFailedLogin, GENERIC_LOGIN_ERROR, isAccountLocked } from './auth';
+import { applyFailedLogin, GENERIC_LOGIN_ERROR, isAccountLocked, peekStoredSession, persistSession, restoreBrowserSession, snapshotBrowserSession } from './auth';
 import { nowUtcIso } from './dates';
 import { deleteDatabase, getDb, OQ_DB_NAME, withDatabase } from './db';
 import { isIssueBlocked, shouldWarnFefo } from './fefo';
@@ -789,13 +789,23 @@ export async function runSelfValidation(
   launchEsign?: ESign,
 ): Promise<ValidationReport> {
   await assertCapability(session, 'runValidation', 'Capability required: runValidation');
+  const snap = snapshotBrowserSession();
   const executedUtc = nowUtcIso();
-  const results = await withDatabase(OQ_DB_NAME, async () => {
-    await deleteDatabase(OQ_DB_NAME);
-    await getDb();
-    await ensureSeeded();
-    return runProtocol(onResult);
-  });
+  let results: OqResult[];
+  try {
+    results = await withDatabase(OQ_DB_NAME, async () => {
+      await deleteDatabase(OQ_DB_NAME);
+      await getDb();
+      await ensureSeeded();
+      return runProtocol(onResult);
+    });
+  } finally {
+    restoreBrowserSession(snap);
+    const live = peekStoredSession();
+    if (live) {
+      persistSession({ ...live, lastActivityUtc: nowUtcIso() });
+    }
+  }
   const passed = results.filter((r) => r.verdict === 'Pass').length;
   const failed = results.filter((r) => r.verdict === 'Fail').length;
   const manual = results.filter((r) => r.verdict === 'Manual').length;

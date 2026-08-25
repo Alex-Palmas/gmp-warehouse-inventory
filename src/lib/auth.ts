@@ -11,7 +11,7 @@ import { nowUtcIso } from './dates';
 import { newId } from './ids';
 import { appendAudit, appendAuditSystem } from './audit';
 import { assertCapability, assertMayAssignRole, getRole, hasCapability, resolveRoleId } from './permissions';
-import { clearViewAs } from './viewAs';
+import { clearViewAs, VIEW_AS_KEY } from './viewAs';
 import {
   assertPasswordPolicy,
   nextPasswordHistory,
@@ -80,6 +80,22 @@ export function clearSession(): void {
 
 export function persistSession(s: Session): void {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+}
+
+export type BrowserSessionSnapshot = { session: string | null; viewAs: string | null };
+
+export function snapshotBrowserSession(): BrowserSessionSnapshot {
+  return {
+    session: sessionStorage.getItem(SESSION_KEY),
+    viewAs: sessionStorage.getItem(VIEW_AS_KEY),
+  };
+}
+
+export function restoreBrowserSession(snap: BrowserSessionSnapshot): void {
+  if (snap.session === null) sessionStorage.removeItem(SESSION_KEY);
+  else sessionStorage.setItem(SESSION_KEY, snap.session);
+  if (snap.viewAs === null) sessionStorage.removeItem(VIEW_AS_KEY);
+  else sessionStorage.setItem(VIEW_AS_KEY, snap.viewAs);
 }
 
 export async function logAccess(
@@ -214,6 +230,7 @@ export async function login(userId: string, password: string): Promise<Session> 
 export async function logout(
   session: Session | null,
   action: 'LOGOUT' | 'SESSION_TIMEOUT' = 'LOGOUT',
+  opts?: { keepBrowserSession?: boolean },
 ): Promise<void> {
   if (session) {
     await logAccess(session.userId, session.fullName, action, '');
@@ -223,7 +240,9 @@ export async function logout(
       reasonForChange: action === 'SESSION_TIMEOUT' ? 'Idle timeout (15 min)' : '',
     });
   }
-  clearSession();
+  if (!opts?.keepBrowserSession) {
+    clearSession();
+  }
 }
 
 export async function reverifyPassword(userId: string, password: string): Promise<boolean> {

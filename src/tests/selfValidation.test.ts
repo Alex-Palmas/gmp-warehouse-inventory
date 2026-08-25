@@ -60,7 +60,27 @@ describe('runSelfValidation sandbox isolation', () => {
     await db.put('meta', 'prod-marker', 'oq-isolation-test');
     await db.put('meta', { year: 1999, lastN: 42 }, 'prodIsolationSerial');
 
+    sessionStorage.setItem(
+      'gmp-wh-session',
+      JSON.stringify({
+        userId: 'super',
+        fullName: 'super',
+        role: 'super',
+        roleName: 'super',
+        startedUtc: new Date().toISOString(),
+        lastActivityUtc: new Date().toISOString(),
+        mustChangePassword: false,
+      }),
+    );
+    sessionStorage.setItem('gmp-wh-view-as', 'super');
+
     const report = await runSelfValidation(sess('validation', 'val'));
+
+    const storedRaw = sessionStorage.getItem('gmp-wh-session');
+    expect(storedRaw).toBeTruthy();
+    const stored = JSON.parse(storedRaw as string) as Session;
+    expect(stored.userId).toBe('super');
+    expect(sessionStorage.getItem('gmp-wh-view-as')).toBe('super');
 
     expect(currentDbName()).toBe(PROD_DB_NAME);
     const after = await getDb();
