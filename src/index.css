@@ -480,3 +480,47 @@ a.kpi-link:hover, a.kpi-link:focus {
   color: var(--ink);
 }
 .present-hint { color: var(--accent-ink); font-size: 12.5px; }
+
+
+.attach-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; }
+.attach-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #eef6ff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+html[data-theme="dark"] .attach-row { background: var(--accent-soft); }
+.attach-inherited {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.attach-cat {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.attach-receipt {
+  background: #f8fbff;
+  border-color: #dbeafe;
+  box-shadow: none;
+  margin: 4px 0 8px;
+}
+html[data-theme="dark"] .attach-receipt { background: var(--surface-2); border-color: var(--line); }
+.attach-clip {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  padding: 0 6px;
+  border-radius: 999px;
+  margin-left: 4px;
+}

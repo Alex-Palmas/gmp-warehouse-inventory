@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { InventoryRecord } from '../types';
+import type { AuditEntry, InventoryRecord, Session } from '../types';
 import { getInventory } from '../lib/inventory';
 import { listAuditForRecord } from '../lib/audit';
-import type { AuditEntry } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
+import { AttachmentList } from '../components/AttachmentList';
 import { locationToString, toDisplayLocal } from '../lib/dates';
 
-export function ScanLookup() {
+export function ScanLookup({ session }: { session: Session }) {
   const [sp] = useSearchParams();
   const serial = (sp.get('serial') ?? '').trim();
   const [rec, setRec] = useState<InventoryRecord | undefined>();
@@ -46,6 +46,7 @@ export function ScanLookup() {
           <p>
             <Link to={`/record/${rec.serial}`}>Open full record</Link>
           </p>
+          <AttachmentList session={session} record={rec} />
         </div>
       )}
       {audit.length > 0 && (

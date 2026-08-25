@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { AuditEntry, InventoryRecord } from '../types';
+import type { AuditEntry, InventoryRecord, Session } from '../types';
 import { getInventory } from '../lib/inventory';
 import { listAuditForRecord } from '../lib/audit';
 import { StatusBadge } from '../components/StatusBadge';
+import { AttachmentList } from '../components/AttachmentList';
 import { locationToString, toDisplayLocal } from '../lib/dates';
 
-export function RecordDetail() {
+export function RecordDetail({ session }: { session: Session }) {
   const { serial } = useParams();
   const [rec, setRec] = useState<InventoryRecord | undefined>();
   const [audit, setAudit] = useState<AuditEntry[]>([]);
@@ -66,6 +67,7 @@ export function RecordDetail() {
           ))}
         </tbody>
       </table>
+      <AttachmentList session={session} record={rec} />
       <h2 style={{ marginTop: 16 }}>Audit trail</h2>
       <table>
         <thead>

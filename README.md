@@ -5,11 +5,11 @@ Standalone **system of record** for warehouse containers in a pharmaceutical / b
 
 This application is a technical control set that *can support* 21 CFR Part 11, 21 CFR 211 warehouse/records, EU GMP Annex 11, ALCOA+, and GAMP 5 **after** the site executes IQ/OQ/PQ, trains users, and adopts SOPs. It is **not** certified, validated, or fully compliant as shipped.
 
-Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.8`
+Document number: `DOC-WH-INV-001` · Version: `1.3` · App version: `1.3.9`
 
 ## Intended use
 
-Local (single-node, browser) inventory register for **per-container** serials (`WH-YYYY-NNNNNN`), receipt batches (`RCV-YYYY-NNNNNN`), goods receipt into Quarantine, QA e-signed lot-release of sibling containers, sampling, material submissions, material requests (`MR-YYYY-NNNNNN`) with FEFO auto-reserve → scan pick → issue, location barcodes, append-only audit trail, JSON backup/restore, and Excel reports (reports are not the system of record).
+Local (single-node, browser) inventory register for **per-container** serials (`WH-YYYY-NNNNNN`), receipt batches (`RCV-YYYY-NNNNNN`), goods receipt into Quarantine, QA e-signed lot-release of sibling containers, sampling, material submissions, material requests (`MR-YYYY-NNNNNN`) with FEFO auto-reserve → scan pick → issue, location barcodes, append-only audit trail, JSON backup/restore, and Excel reports (reports are not the system of record). Optional CoA/certificate files (PDF, JPEG, PNG, WebP, GIF; max 10 MB) may be stored in IndexedDB against a serial or the receipt batch. This is not a validated document management system; backup JSON includes base64 attachment bytes.
 
 See `docs/10-Intended-Use-Known-Limitations.md`, `docs/11-Access-Control-Matrix.md`, `docs/12-Material-Request-and-Serialization.md`, and `docs/13-Part11-Access-and-Audit.md`.
 

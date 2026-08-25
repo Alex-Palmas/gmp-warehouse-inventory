@@ -41,6 +41,7 @@ Every URS row must have an FS function and an OQ test. Automated vitest (`src/te
 | URS-25 Sample / retain child serial | F-14 | OQ-23 | — | `serialization.test.ts` |
 | URS-26 Location barcode putaway | F-14 | OQ-24 | PQ-07 | — |
 | URS-27 Clickable dashboard KPIs | F-09 | OQ-14 | — | `kpiFilter.test.ts` |
+| URS-28 CoA / certificate attachments | F-02 receipt; attachments store | — | — | `attachments.test.ts` |
 
 Part 11 mapping detail: `docs/13-Part11-Access-and-Audit.md`. Access defaults: `docs/11-Access-Control-Matrix.md`. Request/serialization: `docs/12-Material-Request-and-Serialization.md`.
 

@@ -1,6 +1,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import type {
   AccessLogEntry,
+  AttachmentRecord,
   AuditEntry,
   InboxMessage,
   InventoryRecord,
@@ -16,7 +17,7 @@ import type {
 } from '../types';
 
 const DB_NAME = 'gmp-wh-inv';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let _db: IDBPDatabase | null = null;
 
@@ -43,6 +44,10 @@ export async function getDb(): Promise<IDBPDatabase> {
       if (!db.objectStoreNames.contains('materialRequests'))
         db.createObjectStore('materialRequests', { keyPath: 'requestId' });
       if (!db.objectStoreNames.contains('inbox')) db.createObjectStore('inbox', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('attachments')) {
+        const s = db.createObjectStore('attachments', { keyPath: 'id' });
+        s.createIndex('recordId', 'recordId');
+      }
     },
   });
   return _db;
@@ -54,6 +59,8 @@ export async function resetDbConnection(): Promise<void> {
     _db = null;
   }
 }
+
+export type AttachmentBackupRow = Omit<AttachmentRecord, 'blob'> & { dataBase64: string };
 
 export type BackupPayload = {
   appVersion: string;
@@ -74,5 +81,6 @@ export type BackupPayload = {
   materialSubmissions: MaterialSubmission[];
   materialRequests: MaterialRequest[];
   inbox: InboxMessage[];
+  attachments?: AttachmentBackupRow[];
   seeded: boolean;
 };

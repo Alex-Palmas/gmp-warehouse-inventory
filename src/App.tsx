@@ -189,7 +189,7 @@ export default function App() {
             </CapRoute>
           }
         />
-        <Route path="record/:serial" element={<RecordDetail />} />
+        <Route path="record/:serial" element={<RecordDetail session={effective} />} />
         <Route
           path="receive"
           element={
@@ -291,7 +291,7 @@ export default function App() {
           path="scan"
           element={
             <CapRoute session={effective} cap="scanLookup">
-              <ScanLookup />
+              <ScanLookup session={effective} />
             </CapRoute>
           }
         />

@@ -71,3 +71,8 @@ Seeded role **requester** (Requester / Lab-Production). Demo user `lab` / `LabUs
 ## 8. Later (not this version)
 
 Kitting / BOM issue, ASN / CSV inbound, temperature excursion logs.
+
+## 9. Certificates / CoA attachments
+
+Operators (`receive`) and QA (`qaDisposition`) may attach CoA, CofC, SDS, Spec, or Other files (PDF, JPEG, PNG, WebP, GIF; max 10 MB) at goods receipt — lot-level on the receipt batch and optionally per serial — or later from the record / scan page. Files are stored in IndexedDB with the serial or receipt batch; this is **not** a validated document management system. Backup JSON includes base64 attachment bytes. Audit `ATTACHMENT_ADD` records file name and SHA-256, not the blob. Append-only (no delete).
+

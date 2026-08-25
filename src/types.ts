@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.3.8';
+export const APP_VERSION = '1.3.9';
 export const DOC_ID = 'DOC-WH-INV-001';
 export const DOC_VERSION = '1.3';
 export const VALIDATION_BANNER =
@@ -406,6 +406,23 @@ export interface InventoryRecord {
   holdReason?: string;
 }
 
+export const ATTACHMENT_CATEGORIES = ['CoA', 'CofC', 'SDS', 'Spec', 'Other'] as const;
+export type AttachmentCategory = (typeof ATTACHMENT_CATEGORIES)[number];
+export type AttachmentScope = 'serial' | 'receiptBatch';
+export interface AttachmentRecord {
+  id: string; // ATT-...
+  scope: AttachmentScope;
+  recordId: string; // serial or receiptBatchId
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+  category: AttachmentCategory;
+  blob: Blob;
+  uploadedBy: string;
+  uploadedOnUtc: string;
+}
+
 export interface Movement {
   id: string;
   serial: string;
@@ -494,7 +511,8 @@ export type AuditAction =
   | 'LOCKOUT'
   | 'EXPORT'
   | 'PASSWORD_RESET'
-  | 'REQUEST_UNPICK';
+  | 'REQUEST_UNPICK'
+  | 'ATTACHMENT_ADD';
 
 export interface PickedLine {
   serial: string;

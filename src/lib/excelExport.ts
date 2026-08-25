@@ -16,6 +16,7 @@ import { nowUtcIso, toDisplayLocal, locationToString } from './dates';
 import { assertCapability, getLiveMatrix, listRoles } from './permissions';
 import { listRequests } from './requests';
 import { listSubmissions } from './submissions';
+import { listAllAttachments } from './attachments';
 
 function footer(ws: ExcelJS.Worksheet, exportedBy: string, n: number): void {
   const r = n + 2;
@@ -267,6 +268,38 @@ export async function exportExcelWorkbook(session: Session): Promise<Blob> {
   }
   styleHeader(wsSub, subh.length);
   footer(wsSub, session.userId, subs.length + 1);
+
+  const atts = await listAllAttachments();
+  const wsAtt = wb.addWorksheet('Attachments');
+  const atth = [
+    'ID',
+    'Scope',
+    'Record',
+    'File',
+    'MIME',
+    'Bytes',
+    'SHA256',
+    'Category',
+    'Uploaded by',
+    'UTC',
+  ];
+  wsAtt.addRow(atth);
+  for (const a of atts) {
+    wsAtt.addRow([
+      a.id,
+      a.scope,
+      a.recordId,
+      a.fileName,
+      a.mimeType,
+      a.sizeBytes,
+      a.sha256,
+      a.category,
+      a.uploadedBy,
+      a.uploadedOnUtc,
+    ]);
+  }
+  styleHeader(wsAtt, atth.length);
+  footer(wsAtt, session.userId, atts.length + 1);
 
   const roles = await listRoles();
   const matrix = await getLiveMatrix();

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import type { InventoryRecord, Status } from '../types';
 import { STATUSES } from '../types';
 import { listInventory } from '../lib/inventory';
+import { listAllAttachments } from '../lib/attachments';
 import { StatusBadge } from '../components/StatusBadge';
 import { locationToString, todayIsoDateInTz } from '../lib/dates';
 import { EXTRA_FILTERS, extraFilterLabel, matchesRegisterKpi, parseRegisterQuery } from '../lib/kpiFilter';
@@ -14,11 +15,17 @@ export function InventoryRegister() {
   const [rows, setRows] = useState<InventoryRecord[]>([]);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [attachCounts, setAttachCounts] = useState<Record<string, number>>({});
   const [sp, setSp] = useSearchParams();
   const { status: st, extra } = parseRegisterQuery(sp);
   const asOf = todayIsoDateInTz();
   useEffect(() => {
     void listInventory().then(setRows);
+    void listAllAttachments().then((all) => {
+      const map: Record<string, number> = {};
+      for (const a of all) map[a.recordId] = (map[a.recordId] ?? 0) + 1;
+      setAttachCounts(map);
+    });
   }, []);
 
   function setStatus(v: Status | '') {
@@ -152,6 +159,7 @@ export function InventoryRegister() {
                 batchId={g.batchId}
                 onToggle={() => toggle(g.batchId)}
                 query={q}
+                attachCounts={attachCounts}
               />
             );
           })}
@@ -171,6 +179,7 @@ function RegisterGroup({
   batchId,
   onToggle,
   query,
+  attachCounts,
 }: {
   multi: boolean;
   expanded: boolean;
@@ -181,6 +190,7 @@ function RegisterGroup({
   batchId: string;
   onToggle: () => void;
   query: string;
+  attachCounts: Record<string, number>;
 }) {
   const q = query.toLowerCase();
   return (
@@ -197,14 +207,18 @@ function RegisterGroup({
           {multi ? (
             <>
               <div>
-                <Link to={`/record/${head.serial}`}>{batchId}</Link>
+                <Link to={`/record/${head.serial}`}>{batchId}</Link>{' '}
+                <AttachClip n={(attachCounts[batchId] ?? 0) + rows.reduce((s, r) => s + (attachCounts[r.serial] ?? 0), 0)} />
               </div>
               <div className="help">
                 {rows.length} containers · {head.containerType}
               </div>
             </>
           ) : (
-            <Link to={`/record/${head.serial}`}>{head.serial}</Link>
+            <>
+              <Link to={`/record/${head.serial}`}>{head.serial}</Link>{' '}
+              <AttachClip n={countForRecord(head, attachCounts)} />
+            </>
           )}
         </td>
         <td>
@@ -231,7 +245,8 @@ function RegisterGroup({
           <tr key={r.serial} className={q && r.serial.toLowerCase().includes(q) ? 'highlight' : 'child-row'}>
             <td></td>
             <td className="mono">
-              <Link to={`/record/${r.serial}`}>{r.serial}</Link>
+              <Link to={`/record/${r.serial}`}>{r.serial}</Link>{' '}
+              <AttachClip n={countForRecord(r, attachCounts)} />
               <div className="help">
                 {r.containerIndex} of {r.numberOfContainers} · {r.recordKind ?? 'container'}
                 {r.parentSerial ? ` · parent ${r.parentSerial}` : ''}
@@ -257,5 +272,21 @@ function RegisterGroup({
           </tr>
         ))}
     </>
+  );
+}
+
+function countForRecord(r: InventoryRecord, map: Record<string, number>): number {
+  const own = map[r.serial] ?? 0;
+  const batch = r.receiptBatchId && r.receiptBatchId !== r.serial ? (map[r.receiptBatchId] ?? 0) : 0;
+  return own + batch;
+}
+
+function AttachClip({ n }: { n: number }) {
+
+  if (!n) return null;
+  return (
+    <span className="attach-clip" title={`${n} attachment${n === 1 ? '' : 's'}`}>
+      📎 {n}
+    </span>
   );
 }

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCap } from '../hooks/useCap';
 import { CapChecking, CapDenied } from '../components/CapGuard';
-import type { InventoryRecord, Material, Session } from '../types';
+import type { AttachmentCategory, InventoryRecord, Material, Session } from '../types';
 import {
+  ATTACHMENT_CATEGORIES,
   CONTAINER_TYPES,
   ITEM_TYPES,
   PHARMACOPEIAS,
@@ -12,6 +13,7 @@ import {
 } from '../types';
 import { listMaterials } from '../lib/materials';
 import { receiveGoods } from '../lib/inventory';
+import { addAttachments, ATTACH_ACCEPT } from '../lib/attachments';
 import { LocationFields, emptyLocation } from '../components/fields';
 import { todayIsoDateInTz } from '../lib/dates';
 
@@ -36,6 +38,10 @@ export function GoodsReceipt({ session }: { session: Session }) {
   });
   const [err, setErr] = useState('');
   const [printAfter, setPrintAfter] = useState(true);
+  const [batchCat, setBatchCat] = useState<AttachmentCategory>('CoA');
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [perCat, setPerCat] = useState<AttachmentCategory>('CoA');
+  const [perFiles, setPerFiles] = useState<File[][]>([]);
   const nav = useNavigate();
 
   useEffect(() => {
@@ -72,6 +78,10 @@ export function GoodsReceipt({ session }: { session: Session }) {
   const n = Number(form.numberOfContainers) || 0;
   const per = Number(form.qtyPerContainer) || 0;
   const total = n * per;
+
+  useEffect(() => {
+    setPerFiles((prev) => Array.from({ length: Math.max(n, 0) }, (_, i) => prev[i] ?? []));
+  }, [n]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -126,6 +136,32 @@ export function GoodsReceipt({ session }: { session: Session }) {
         );
       } catch {
         /* ignore quota */
+      }
+      const attachItems = [
+        ...batchFiles.map((file) => ({
+          scope: 'receiptBatch' as const,
+          recordId: recs[0]?.receiptBatchId ?? '',
+          file,
+          category: batchCat,
+        })),
+        ...recs.flatMap((rec, i) =>
+          (perFiles[i] ?? []).map((file) => ({
+            scope: 'serial' as const,
+            recordId: rec.serial,
+            file,
+            category: perCat,
+          })),
+        ),
+      ].filter((item) => item.recordId && item.file);
+      if (attachItems.length) {
+        try {
+          await addAttachments(session, attachItems);
+        } catch (attachEx) {
+          const msg = attachEx instanceof Error ? attachEx.message : 'Attachment failed';
+          window.alert(
+            `Received ${recs.length} serial(s). Attachments failed: ${msg}\nSerials exist — add files from the register.`,
+          );
+        }
       }
       const batch = recs[0]?.receiptBatchId;
       if (printAfter && batch) nav(`/reprint?batch=${encodeURIComponent(batch)}&autoprint=1`);
@@ -291,6 +327,59 @@ export function GoodsReceipt({ session }: { session: Session }) {
           Will allocate <strong>{n}</strong> unique serials: {n} × {form.containerType ?? 'container'} × {per}{' '}
           {form.uom} (total {total} {form.uom}). Vial/bottle typically 1 each; drum/bag have fill quantity.
         </p>
+        <div className="card attach-receipt">
+          <h2>Certificates / attachments</h2>
+          <p className="help">
+            Optional. PDF, JPEG, PNG, WebP, GIF · max 10 MB each. Lot CoA applies to the whole receipt batch.
+            Per-container files are optional.
+          </p>
+          <div className="grid grid-2">
+            <label>
+              Category
+              <select value={batchCat} onChange={(e) => setBatchCat(e.target.value as AttachmentCategory)}>
+                {ATTACHMENT_CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Apply to all serials in this receipt
+              <input
+                type="file"
+                multiple
+                accept={ATTACH_ACCEPT}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length) setBatchFiles((prev) => [...prev, ...files]);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+          {batchFiles.map((f, i) => (
+            <div key={`${f.name}-${i}`} className="attach-row">
+              <span className="mono">{f.name}</span>
+              <span className="help">{(f.size / 1024).toFixed(1)} KB</span>
+              <button
+                type="button"
+                className="btn btn-sec"
+                onClick={() => setBatchFiles((prev) => prev.filter((_, j) => j !== i))}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <h3>Per-container files (optional)</h3>
+          <label>
+            Category for container files
+            <select value={perCat} onChange={(e) => setPerCat(e.target.value as AttachmentCategory)}>
+              {ATTACHMENT_CATEGORIES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+          <PerContainerFileInputs n={n} files={perFiles} onChange={setPerFiles} />
+        </div>
         <div className="grid grid-4">
           <label>
             Date of manufacture
@@ -342,4 +431,70 @@ export function GoodsReceipt({ session }: { session: Session }) {
       </form>
     </div>
   );
+}
+
+function PerContainerFileInputs({
+  n,
+  files,
+  onChange,
+}: {
+  n: number;
+  files: File[][];
+  onChange: (next: File[][]) => void;
+}) {
+  const list = (
+    <div className="attach-list">
+      {Array.from({ length: Math.max(n, 0) }, (_, i) => (
+        <div key={i} className="attach-row">
+          <span>
+            Container {i + 1} of {n}
+          </span>
+          <input
+            type="file"
+            multiple
+            accept={ATTACH_ACCEPT}
+            onChange={(e) => {
+              const added = Array.from(e.target.files ?? []);
+              onChange(
+                Array.from({ length: Math.max(n, 0) }, (__, j) =>
+                  j === i ? [...(files[j] ?? []), ...added] : (files[j] ?? []),
+                ),
+              );
+              e.target.value = '';
+            }}
+          />
+          {(files[i] ?? []).map((f, fi) => (
+            <span key={`${f.name}-${fi}`} className="help">
+              {f.name}{' '}
+              <button
+                type="button"
+                className="btn btn-sec"
+                onClick={() =>
+                  onChange(
+                    Array.from({ length: Math.max(n, 0) }, (__, j) =>
+                      j === i ? (files[j] ?? []).filter((_, k) => k !== fi) : (files[j] ?? []),
+                    ),
+                  )
+                }
+              >
+                Remove
+              </button>
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+  if (n > 24) {
+    return (
+      <details>
+        <summary>Per-container files for {n} containers</summary>
+        <p className="help">
+          For large receipts, attach the lot CoA above; add per-vial files after save from the register.
+        </p>
+        {list}
+      </details>
+    );
+  }
+  return list;
 }
