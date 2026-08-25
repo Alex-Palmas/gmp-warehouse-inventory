@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.3.4';
+export const APP_VERSION = '1.3.5';
 export const DOC_ID = 'DOC-WH-INV-001';
 export const DOC_VERSION = '1.3';
 export const VALIDATION_BANNER =

@@ -54,6 +54,10 @@ export function Login({ onLogin }: { onLogin: (s: Session) => void }) {
             <button className="btn" type="submit">
               Sign in
             </button>
+            <p className="help">
+              Presentation walkthrough: user ID <span className="mono">super</span> / password{' '}
+              <span className="mono">Super123!xx</span>. After sign-in a View as bar lets you simulate each role.
+            </p>
           </form>
         </div>
       </div>

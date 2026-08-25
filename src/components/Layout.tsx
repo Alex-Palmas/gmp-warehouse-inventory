@@ -123,22 +123,6 @@ export function Layout({
         </nav>
         <div className="userbox">
           <ThemeToggle />
-          {canViewAs && (
-            <label className="view-as">
-              View as
-              <select
-                value={viewAs}
-                onChange={(e) => onViewAs(e.target.value)}
-                aria-label="Simulate access level"
-              >
-                {viewAsOptions().map((o) => (
-                  <option key={o.roleId} value={o.roleId}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           <div className="who">
             {session.fullName} ({session.userId})
             <br />
@@ -149,6 +133,26 @@ export function Layout({
           </button>
         </div>
       </header>
+      {canViewAs && (
+        <div className="present-bar no-print">
+          <span className="present-kicker">Presentation</span>
+          <label className="present-as">
+            View as
+            <select
+              value={viewAs}
+              onChange={(e) => onViewAs(e.target.value)}
+              aria-label="Simulate access level"
+            >
+              {viewAsOptions().map((o) => (
+                <option key={o.roleId} value={o.roleId}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="present-hint">Nav, buttons, and pages follow this access level.</span>
+        </div>
+      )}
       <div className="workstrip no-print">
         {(caps?.has('submitRequest') || caps?.has('fulfillRequest')) && (
           <NavLink to="/requests" className="workstrip-btn">

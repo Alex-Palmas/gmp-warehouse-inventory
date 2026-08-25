@@ -428,18 +428,41 @@ html[data-theme="dark"] .st-Released { color: #052e16; }
   padding: 12px 16px;
 }
 
-.view-as {
-  font-size: 10px;
-  letter-spacing: .06em;
+.present-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent);
+  color: var(--accent-ink);
+}
+.present-kicker {
+  background: var(--accent);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--muted);
-  gap: 3px;
-  min-width: 170px;
 }
-.view-as select {
+.present-as {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 700;
   text-transform: none;
-  letter-spacing: 0;
-  font-size: 12px;
-  font-weight: 650;
-  padding: 5px 8px;
 }
+.present-as select {
+  min-width: 240px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.present-hint { color: var(--accent-ink); font-size: 12.5px; }
